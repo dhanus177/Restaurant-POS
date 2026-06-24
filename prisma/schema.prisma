@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id   String @id
+  name String
+  pin  String
+  role String
+}
+
+model Category {
+  id          String     @id
+  name        String
+  description String?
+  color       String?
+  order       Int
+  icon        String?
+  menuItems   MenuItem[]
+}
+
+model MenuItem {
+  id             String          @id
+  name           String
+  price          Float
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  description    String?
+  image          String?
+  isAvailable    Boolean         @default(true)
+  modifierGroups ModifierGroup[]
+  recipes        ProductRecipe[]
+}
+
+model ModifierGroup {
+  id            String     @id
+  name          String
+  required      Boolean
+  maxSelections Int
+  menuItemId    String
+  menuItem      MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  modifiers     Modifier[]
+}
+
+model Modifier {
+  id              String        @id
+  name            String
+  price           Float
+  modifierGroupId String
+  modifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+}
+
+model RestaurantTable {
+  id             String  @id
+  number         Int
+  name           String
+  seats          Int
+  status         String
+  currentOrderId String?
+}
+
+model Order {
+  id            String      @id
+  orderNumber   Int
+  tableId       String?
+  tableName     String?
+  subtotal      Float
+  tax           Float
+  total         Float
+  status        String
+  paymentMethod String?
+  paymentStatus String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  createdBy     String
+  isPriority    Boolean     @default(false)
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id         String @id
+  orderId    String
+  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId String
+  name       String
+  quantity   Int
+  price      Float
+  modifiers  Json   @default("[]")
+  notes      String?
+}
+
+model Supplier {
+  id             String          @id
+  name           String
+  contact        String
+  email          String
+  phone          String
+  inventoryItems InventoryItem[]
+}
+
+model InventoryItem {
+  id            String            @id
+  name          String
+  sku           String            @unique
+  quantity      Float
+  unit          String
+  minQuantity   Float
+  costPrice     Float
+  supplierId    String?
+  supplier      Supplier?         @relation(fields: [supplierId], references: [id])
+  lastRestocked DateTime?
+  category      String
+  adjustments   StockAdjustment[]
+  recipes       ProductRecipe[]   @relation("RecipeIngredient")
+}
+
+model ProductRecipe {
+  id           String        @id
+  productId    String        @map("product_id")
+  ingredientId String        @map("ingredient_id")
+  quantity     Float
+  product      MenuItem      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredient   InventoryItem @relation("RecipeIngredient", fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([ingredientId])
+  @@map("product_recipes")
+}
+
+model StockAdjustment {
+  id              String        @id
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  type            String
+  quantity        Float
+  reason          String
+  createdAt       DateTime      @default(now())
+  createdBy       String
+}
+
+model Settings {
+  id             String  @id @default("singleton")
+  restaurantName String
+  address        String
+  phone          String
+  taxRate        Float
+  currency       String
+  currencySymbol String
+  receiptFooter  String
+  logo           String?
+}
