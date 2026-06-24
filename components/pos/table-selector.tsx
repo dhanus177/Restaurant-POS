@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { usePOSStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { Users } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 interface TableSelectorProps {
   open: boolean
@@ -13,7 +15,9 @@ interface TableSelectorProps {
 }
 
 export function TableSelector({ open, onClose }: TableSelectorProps) {
-  const { tables, selectedTable, setSelectedTable } = usePOSStore()
+  const { tables, selectedTable, setSelectedTable, currentCustomerCount, setCurrentCustomerCount } = usePOSStore()
+
+  const fitTables = tables.filter((t) => t.seats >= currentCustomerCount)
 
   const handleSelectTable = (tableId: string | null) => {
     if (tableId === null) {
@@ -48,6 +52,21 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
         </DialogHeader>
 
         <div className="py-4">
+          <div className="mb-4 rounded-lg border p-3 bg-secondary/30">
+            <Label htmlFor="customerCount">Customer Count</Label>
+            <Input
+              id="customerCount"
+              type="number"
+              min={1}
+              value={currentCustomerCount}
+              onChange={(e) => setCurrentCustomerCount(parseInt(e.target.value || '1', 10))}
+              className="mt-2"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Matching tables: {fitTables.length} • Split amount per customer is shown on billing.
+            </p>
+          </div>
+
           <div className="flex gap-4 mb-4">
             <Badge variant="outline" className="gap-1">
               <div className="h-2 w-2 rounded-full bg-primary" />
@@ -84,16 +103,19 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
                   'h-20 flex-col gap-1 transition-colors',
                   getStatusColor(table.status),
                   selectedTable?.id === table.id && 'ring-2 ring-primary',
-                  table.status !== 'available' && 'cursor-not-allowed opacity-60'
+                  (table.status !== 'available' || table.seats < currentCustomerCount) && 'cursor-not-allowed opacity-60'
                 )}
                 onClick={() => handleSelectTable(table.id)}
-                disabled={table.status !== 'available'}
+                disabled={table.status !== 'available' || table.seats < currentCustomerCount}
               >
                 <span className="font-semibold">{table.name}</span>
                 <div className="flex items-center gap-1 text-xs opacity-80">
                   <Users className="h-3 w-3" />
                   {table.seats}
                 </div>
+                {table.seats < currentCustomerCount && (
+                  <span className="text-[10px] text-destructive">Too small</span>
+                )}
               </Button>
             ))}
           </div>

@@ -45,6 +45,7 @@ export interface MenuItem {
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'card' | 'split'
 export type PaymentStatus = 'pending' | 'paid' | 'refunded'
+export type OrderSource = 'counter' | 'diner-mobile'
 
 export interface SelectedModifier {
   id: string

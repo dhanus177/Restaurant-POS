@@ -17,11 +17,12 @@ interface PaymentModalProps {
   open: boolean
   onClose: () => void
   onComplete: () => void
+  order?: Order | null
 }
 
 const quickCashAmounts = [5, 10, 20, 50, 100]
 
-export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
+export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalProps) {
   const {
     cart,
     selectedTable,
@@ -30,6 +31,7 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
     getCartTotal,
     getNextOrderNumber,
     addOrder,
+    updateOrderPayment,
     updateTableStatus,
     clearCart,
   } = usePOSStore()
@@ -40,7 +42,10 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
   const [isComplete, setIsComplete] = useState(false)
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null)
 
-  const { subtotal, tax, total } = getCartTotal()
+  const cartTotals = getCartTotal()
+  const subtotal = order?.subtotal ?? cartTotals.subtotal
+  const tax = order?.tax ?? cartTotals.tax
+  const total = order?.total ?? cartTotals.total
   const cashAmount = parseFloat(cashReceived) || 0
   const change = cashAmount - total
 
@@ -54,6 +59,15 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
 
     // Simulate payment processing
     await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    if (order) {
+      updateOrderPayment(order.id, paymentMethod, 'paid')
+      setCompletedOrder({ ...order, paymentMethod, paymentStatus: 'paid' })
+      setIsComplete(true)
+      setIsProcessing(false)
+      toast.success(`Bill #${order.orderNumber} paid successfully!`)
+      return
+    }
 
     const orderNumber = getNextOrderNumber()
     const order: Order = {
@@ -96,8 +110,11 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
   }
 
   const handleClose = () => {
-    if (isComplete) {
+    if (isComplete && !order) {
       clearCart()
+      onComplete()
+    }
+    if (isComplete && order) {
       onComplete()
     }
     setPaymentMethod('cash')
@@ -109,7 +126,9 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
   }
 
   const handleNewOrder = () => {
-    clearCart()
+    if (!order) {
+      clearCart()
+    }
     handleClose()
     onComplete()
   }
@@ -150,7 +169,7 @@ export function PaymentModal({ open, onClose, onComplete }: PaymentModalProps) {
                 Print Receipt
               </Button>
               <Button onClick={handleNewOrder} className="gap-2">
-                Start New Order
+                {order ? 'Back to Pay Counter' : 'Start New Order'}
               </Button>
             </div>
           </div>

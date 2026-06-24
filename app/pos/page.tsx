@@ -8,7 +8,6 @@ import { MenuGrid } from '@/components/pos/menu-grid'
 import { Cart } from '@/components/pos/cart'
 import { OrderModifiers } from '@/components/pos/order-modifiers'
 import { TableSelector } from '@/components/pos/table-selector'
-import { PaymentModal } from '@/components/pos/payment-modal'
 import type { MenuItem, SelectedModifier } from '@/lib/types'
 
 export default function POSPage() {
@@ -18,7 +17,6 @@ export default function POSPage() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [showModifiers, setShowModifiers] = useState(false)
   const [showTableSelector, setShowTableSelector] = useState(false)
-  const [showPayment, setShowPayment] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -81,7 +79,7 @@ export default function POSPage() {
         {/* Cart Section */}
         <div className="w-full max-w-sm">
           <Cart
-            onCheckout={() => setShowPayment(true)}
+            onCreateBill={() => router.push('/billing')}
             onSelectTable={() => setShowTableSelector(true)}
           />
         </div>
@@ -101,12 +99,6 @@ export default function POSPage() {
       <TableSelector
         open={showTableSelector}
         onClose={() => setShowTableSelector(false)}
-      />
-
-      <PaymentModal
-        open={showPayment}
-        onClose={() => setShowPayment(false)}
-        onComplete={() => setShowPayment(false)}
       />
     </div>
   )

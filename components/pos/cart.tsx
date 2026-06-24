@@ -7,14 +7,27 @@ import { Separator } from '@/components/ui/separator'
 import { Minus, Plus, Trash2, MessageSquare } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 interface CartProps {
-  onCheckout: () => void
+  onCreateBill: () => void
   onSelectTable: () => void
 }
 
-export function Cart({ onCheckout, onSelectTable }: CartProps) {
-  const { cart, selectedTable, settings, removeFromCart, updateCartItemQuantity, updateCartItemNotes, getCartTotal, clearCart } = usePOSStore()
+export function Cart({ onCreateBill, onSelectTable }: CartProps) {
+  const {
+    cart,
+    selectedTable,
+    settings,
+    currentOrderSource,
+    currentCustomerCount,
+    setCurrentOrderSource,
+    removeFromCart,
+    updateCartItemQuantity,
+    updateCartItemNotes,
+    getCartTotal,
+    clearCart,
+  } = usePOSStore()
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
 
@@ -52,6 +65,20 @@ export function Cart({ onCheckout, onSelectTable }: CartProps) {
         >
           {selectedTable ? `Table: ${selectedTable.name}` : 'Select Table (Optional)'}
         </Button>
+
+        <ToggleGroup
+          type="single"
+          value={currentOrderSource}
+          onValueChange={(value) => {
+            if (value === 'counter' || value === 'diner-mobile') {
+              setCurrentOrderSource(value)
+            }
+          }}
+          className="mt-2 grid grid-cols-2"
+        >
+          <ToggleGroupItem value="counter" className="text-xs">Billing Counter</ToggleGroupItem>
+          <ToggleGroupItem value="diner-mobile" className="text-xs">Diner Mobile App</ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
       {/* Cart Items */}
@@ -157,14 +184,21 @@ export function Cart({ onCheckout, onSelectTable }: CartProps) {
             <span>Total</span>
             <span>{settings.currencySymbol}{total.toFixed(2)}</span>
           </div>
+
+          {currentCustomerCount > 1 && (
+            <div className="flex justify-between text-sm text-primary">
+              <span>Per Customer ({currentCustomerCount})</span>
+              <span>{settings.currencySymbol}{(total / currentCustomerCount).toFixed(2)}</span>
+            </div>
+          )}
         </div>
         <Button
           size="lg"
           className="w-full h-14 text-lg font-semibold"
           disabled={cart.length === 0}
-          onClick={onCheckout}
+          onClick={onCreateBill}
         >
-          Pay {settings.currencySymbol}{total.toFixed(2)}
+          Create Bill {settings.currencySymbol}{total.toFixed(2)}
         </Button>
       </div>
     </div>

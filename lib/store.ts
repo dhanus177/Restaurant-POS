@@ -29,6 +29,7 @@ import type {
   OrderStatus,
   TableStatus,
   StockAdjustment,
+  OrderSource,
 } from './types'
 import {
   mockUsers,
@@ -67,12 +68,16 @@ interface POSStore {
   // Cart
   cart: CartItem[]
   selectedTable: Table | null
+  currentCustomerCount: number
+  currentOrderSource: OrderSource
   addToCart: (item: CartItem) => void
   removeFromCart: (itemId: string) => void
   updateCartItemQuantity: (itemId: string, quantity: number) => void
   updateCartItemNotes: (itemId: string, notes: string) => void
   clearCart: () => void
   setSelectedTable: (table: Table | null) => void
+  setCurrentCustomerCount: (count: number) => void
+  setCurrentOrderSource: (source: OrderSource) => void
 
   // Orders
   orders: Order[]
@@ -181,6 +186,8 @@ export const usePOSStore = create<POSStore>()(
       // Cart
       cart: [],
       selectedTable: null,
+      currentCustomerCount: 1,
+      currentOrderSource: 'counter',
       addToCart: (item) =>
         set((state) => {
           const existingIndex = state.cart.findIndex(
@@ -214,8 +221,10 @@ export const usePOSStore = create<POSStore>()(
             i.id === itemId ? { ...i, notes } : i
           ),
         })),
-      clearCart: () => set({ cart: [], selectedTable: null }),
+      clearCart: () => set({ cart: [], selectedTable: null, currentCustomerCount: 1, currentOrderSource: 'counter' }),
       setSelectedTable: (table) => set({ selectedTable: table }),
+      setCurrentCustomerCount: (count) => set({ currentCustomerCount: Math.max(1, count) }),
+      setCurrentOrderSource: (source) => set({ currentOrderSource: source }),
 
       // Orders
       orders: mockOrders,
