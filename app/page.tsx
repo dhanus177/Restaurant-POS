@@ -6,7 +6,7 @@ import { usePOSStore } from '@/lib/store'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UtensilsCrossed, ChefHat, Package, Settings, Lock, Delete } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Settings, Lock, Delete, WalletCards } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,6 +30,9 @@ export default function LoginPage() {
         break
       case 'admin':
         router.push('/admin')
+        break
+      case 'pay-counter':
+        router.push('/pay')
         break
     }
   }
@@ -62,11 +65,12 @@ export default function LoginPage() {
     setError('')
   }
 
-  const handleQuickLogin = (role: 'cashier' | 'kitchen' | 'admin') => {
+  const handleQuickLogin = (role: 'cashier' | 'kitchen' | 'admin' | 'pay-counter') => {
     const pins: Record<string, string> = {
       cashier: '2222',
       kitchen: '3333',
-      admin: '1234'
+      admin: '1234',
+      'pay-counter': '5555',
     }
     const user = loginWithPin(pins[role])
     if (user) {
@@ -179,6 +183,15 @@ export default function LoginPage() {
           >
             <Settings className="h-5 w-5" />
             Admin
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            className="gap-2"
+            onClick={() => handleQuickLogin('pay-counter')}
+          >
+            <WalletCards className="h-5 w-5" />
+            Pay Counter
           </Button>
         </div>
       </div>

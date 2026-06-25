@@ -17,6 +17,7 @@ import {
   Store,
   BookOpen,
   Tags,
+  WalletCards,
 } from 'lucide-react'
 
 const navItems = [
@@ -32,6 +33,7 @@ const navItems = [
 
 const quickLinks = [
   { href: '/pos', label: 'POS Terminal', icon: Store },
+  { href: '/pay', label: 'Pay Counter', icon: WalletCards },
   { href: '/kitchen', label: 'Kitchen Display', icon: ChefHat },
   { href: '/inventory', label: 'Inventory', icon: Package },
 ]

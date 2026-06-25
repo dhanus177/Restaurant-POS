@@ -5,6 +5,7 @@ export const mockUsers: User[] = [
   { id: '2', name: 'Sarah (Cashier)', pin: '2222', role: 'cashier' },
   { id: '3', name: 'Mike (Kitchen)', pin: '3333', role: 'kitchen' },
   { id: '4', name: 'Emma (Cashier)', pin: '4444', role: 'cashier' },
+  { id: '5', name: 'Noah (Pay Counter)', pin: '5555', role: 'pay-counter' },
 ]
 
 export const mockCategories: Category[] = [

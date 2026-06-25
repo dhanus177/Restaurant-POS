@@ -1,5 +1,5 @@
 // User & Roles
-export type Role = 'admin' | 'cashier' | 'kitchen'
+export type Role = 'admin' | 'cashier' | 'kitchen' | 'pay-counter'
 
 export interface User {
   id: string

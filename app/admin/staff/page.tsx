@@ -117,6 +117,8 @@ export default function StaffManagementPage() {
         return 'bg-chart-2 text-chart-2-foreground'
       case 'kitchen':
         return 'bg-warning text-warning-foreground'
+      case 'pay-counter':
+        return 'bg-emerald-600 text-white'
       default:
         return ''
     }
@@ -216,6 +218,7 @@ export default function StaffManagementPage() {
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="cashier">Cashier</SelectItem>
                   <SelectItem value="kitchen">Kitchen</SelectItem>
+                  <SelectItem value="pay-counter">Pay Counter</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User, WalletCards } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
@@ -45,6 +45,8 @@ export function Header({ title }: HeaderProps) {
         return 'bg-chart-2'
       case 'kitchen':
         return 'bg-warning'
+      case 'pay-counter':
+        return 'bg-emerald-600'
       default:
         return 'bg-muted'
     }
@@ -79,6 +81,12 @@ export function Header({ title }: HeaderProps) {
               <Link href="/inventory" className="gap-2">
                 <Package className="h-4 w-4" />
                 Inventory
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/pay" className="gap-2">
+                <WalletCards className="h-4 w-4" />
+                Pay Counter
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
@@ -136,6 +144,14 @@ export function Header({ title }: HeaderProps) {
                   <Link href="/kitchen" className="gap-2">
                     <ChefHat className="h-4 w-4" />
                     Kitchen Display
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {(currentUser?.role === 'admin' || currentUser?.role === 'pay-counter') && (
+                <DropdownMenuItem asChild>
+                  <Link href="/pay" className="gap-2">
+                    <WalletCards className="h-4 w-4" />
+                    Pay Counter
                   </Link>
                 </DropdownMenuItem>
               )}

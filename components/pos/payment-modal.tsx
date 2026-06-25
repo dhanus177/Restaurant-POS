@@ -11,7 +11,7 @@ import { usePOSStore } from '@/lib/store'
 import { Banknote, CreditCard, CheckCircle2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Order, PaymentMethod } from '@/lib/types'
-import { printReceipt, printKitchenDocket } from '@/lib/print'
+import { printReceipt } from '@/lib/print'
 
 interface PaymentModalProps {
   open: boolean
@@ -97,8 +97,8 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
     setIsComplete(true)
     setIsProcessing(false)
 
-    // Auto-print kitchen docket
-    printKitchenDocket(order, settings)
+    // Auto-print final bill receipt only
+    printReceipt(order, settings)
 
     toast.success(`Order #${orderNumber} placed successfully!`)
   }
@@ -166,7 +166,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
             <div className="flex flex-col gap-3">
               <Button variant="outline" onClick={handlePrintReceipt} className="gap-2">
                 <Printer className="h-4 w-4" />
-                Print Receipt
+                Print Final Bill
               </Button>
               <Button onClick={handleNewOrder} className="gap-2">
                 {order ? 'Back to Pay Counter' : 'Start New Order'}
