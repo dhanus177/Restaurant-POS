@@ -30,6 +30,7 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
     name: '',
     sku: '',
     quantity: 0,
+    storageQuantity: 0,
     unit: 'pcs',
     minQuantity: 5,
     costPrice: 0,
@@ -43,6 +44,7 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
         name: item.name,
         sku: item.sku,
         quantity: item.quantity,
+        storageQuantity: item.storageQuantity ?? 0,
         unit: item.unit,
         minQuantity: item.minQuantity,
         costPrice: item.costPrice,
@@ -54,6 +56,7 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
         name: '',
         sku: '',
         quantity: 0,
+        storageQuantity: 0,
         unit: 'pcs',
         minQuantity: 5,
         costPrice: 0,
@@ -129,9 +132,9 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="quantity">Quantity</Label>
+                <Label htmlFor="quantity">Daily Qty</Label>
                 <Input
                   id="quantity"
                   type="number"
@@ -143,6 +146,22 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
                   required
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="storageQuantity">Storage Qty</Label>
+                <Input
+                  id="storageQuantity"
+                  type="number"
+                  step="0.01"
+                  value={formData.storageQuantity}
+                  onChange={(e) =>
+                    setFormData({ ...formData, storageQuantity: parseFloat(e.target.value) || 0 })
+                  }
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="unit">Unit</Label>
                 <Select

@@ -26,7 +26,7 @@ import type { InventoryItem } from '@/lib/types'
 
 export default function InventoryPage() {
   const router = useRouter()
-  const { currentUser, inventory, getLowStockItems, deleteInventoryItem, settings } = usePOSStore()
+  const { currentUser, inventory, stockAdjustments, getLowStockItems, deleteInventoryItem, settings } = usePOSStore()
   const [mounted, setMounted] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [showAdjustment, setShowAdjustment] = useState(false)
@@ -47,7 +47,12 @@ export default function InventoryPage() {
 
   const lowStockItems = getLowStockItems()
   const outOfStockItems = inventory.filter((item) => item.quantity <= 0)
-  const totalValue = inventory.reduce((sum, item) => sum + item.quantity * item.costPrice, 0)
+  const totalDailyQty = inventory.reduce((sum, item) => sum + item.quantity, 0)
+  const totalStorageQty = inventory.reduce((sum, item) => sum + (item.storageQuantity ?? 0), 0)
+  const totalValue = inventory.reduce((sum, item) => sum + (item.quantity + (item.storageQuantity ?? 0)) * item.costPrice, 0)
+  const recentAdjustments = [...stockAdjustments]
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 6)
 
   const handleEdit = (item: InventoryItem) => {
     setSelectedItem(item)
@@ -88,7 +93,7 @@ export default function InventoryPage() {
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -104,22 +109,32 @@ export default function InventoryPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4" />
-                  Inventory Value
+                  <Package className="h-4 w-4" />
+                  Daily Qty
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">
-                  {settings.currencySymbol}{totalValue.toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold">{totalDailyQty.toFixed(2)}</p>
               </CardContent>
             </Card>
 
             <Card className={lowStockItems.length > 0 ? 'border-warning/50' : ''}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4" />
+                  Storage Qty
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{totalStorageQty.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+
+            <Card className={outOfStockItems.length > 0 ? 'border-destructive/50' : ''}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-warning" />
-                  Low Stock
+                  Low Daily Stock
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -133,7 +148,7 @@ export default function InventoryPage() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-destructive" />
-                  Out of Stock
+                  Out of Stock (Daily)
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -144,8 +159,47 @@ export default function InventoryPage() {
             </Card>
           </div>
 
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Stock Value (Daily + Storage): {settings.currencySymbol}{totalValue.toFixed(2)}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+
           {/* Low Stock Alert */}
           {lowStockItems.length > 0 && <LowStockAlert />}
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Recent Stock Movements</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {recentAdjustments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No stock movement recorded yet.</p>
+              ) : (
+                recentAdjustments.map((adjustment) => {
+                  const itemName = inventory.find((i) => i.id === adjustment.inventoryItemId)?.name ?? 'Unknown item'
+                  const movementLabel = adjustment.type === 'transfer'
+                    ? `${adjustment.fromLocation ?? 'inventory'} → ${adjustment.toLocation ?? 'storage'}`
+                    : `${adjustment.type} @ ${adjustment.location ?? 'inventory'}`
+
+                  return (
+                    <div key={adjustment.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                      <div>
+                        <p className="font-medium">{itemName}</p>
+                        <p className="text-muted-foreground">{movementLabel} • {adjustment.reason}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{adjustment.quantity}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(adjustment.createdAt).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </CardContent>
+          </Card>
 
           {/* Actions */}
           <div className="flex justify-between items-center">

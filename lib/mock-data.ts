@@ -320,18 +320,18 @@ export const mockSuppliers: Supplier[] = [
 ]
 
 export const mockInventory: InventoryItem[] = [
-  { id: 'inv-1', name: 'Chicken Breast', sku: 'MEAT-001', quantity: 50, unit: 'kg', minQuantity: 10, costPrice: 8.50, supplierId: 'sup-3', category: 'Meat' },
-  { id: 'inv-2', name: 'Beef Patties', sku: 'MEAT-002', quantity: 100, unit: 'pcs', minQuantity: 20, costPrice: 3.00, supplierId: 'sup-3', category: 'Meat' },
-  { id: 'inv-3', name: 'Salmon Fillet', sku: 'FISH-001', quantity: 25, unit: 'kg', minQuantity: 5, costPrice: 18.00, supplierId: 'sup-1', category: 'Seafood' },
-  { id: 'inv-4', name: 'Burger Buns', sku: 'BREAD-001', quantity: 80, unit: 'pcs', minQuantity: 30, costPrice: 0.50, supplierId: 'sup-1', category: 'Bakery' },
-  { id: 'inv-5', name: 'Lettuce', sku: 'VEG-001', quantity: 15, unit: 'heads', minQuantity: 10, costPrice: 1.50, supplierId: 'sup-1', category: 'Vegetables' },
-  { id: 'inv-6', name: 'Tomatoes', sku: 'VEG-002', quantity: 8, unit: 'kg', minQuantity: 5, costPrice: 2.50, supplierId: 'sup-1', category: 'Vegetables' },
-  { id: 'inv-7', name: 'Potatoes', sku: 'VEG-003', quantity: 40, unit: 'kg', minQuantity: 15, costPrice: 1.20, supplierId: 'sup-1', category: 'Vegetables' },
-  { id: 'inv-8', name: 'Coca-Cola', sku: 'BEV-001', quantity: 48, unit: 'cans', minQuantity: 24, costPrice: 0.80, supplierId: 'sup-2', category: 'Beverages' },
-  { id: 'inv-9', name: 'Coffee Beans', sku: 'BEV-002', quantity: 5, unit: 'kg', minQuantity: 3, costPrice: 25.00, supplierId: 'sup-2', category: 'Beverages' },
-  { id: 'inv-10', name: 'Cooking Oil', sku: 'MISC-001', quantity: 10, unit: 'L', minQuantity: 5, costPrice: 4.00, supplierId: 'sup-1', category: 'Supplies' },
-  { id: 'inv-11', name: 'Cheese Slices', sku: 'DAIRY-001', quantity: 3, unit: 'packs', minQuantity: 5, costPrice: 8.00, supplierId: 'sup-1', category: 'Dairy' },
-  { id: 'inv-12', name: 'Ice Cream (Vanilla)', sku: 'DAIRY-002', quantity: 8, unit: 'L', minQuantity: 4, costPrice: 12.00, supplierId: 'sup-1', category: 'Dairy' },
+  { id: 'inv-1', name: 'Chicken Breast', sku: 'MEAT-001', quantity: 50, storageQuantity: 40, unit: 'kg', minQuantity: 10, costPrice: 8.50, supplierId: 'sup-3', category: 'Meat' },
+  { id: 'inv-2', name: 'Beef Patties', sku: 'MEAT-002', quantity: 100, storageQuantity: 80, unit: 'pcs', minQuantity: 20, costPrice: 3.00, supplierId: 'sup-3', category: 'Meat' },
+  { id: 'inv-3', name: 'Salmon Fillet', sku: 'FISH-001', quantity: 25, storageQuantity: 15, unit: 'kg', minQuantity: 5, costPrice: 18.00, supplierId: 'sup-1', category: 'Seafood' },
+  { id: 'inv-4', name: 'Burger Buns', sku: 'BREAD-001', quantity: 80, storageQuantity: 120, unit: 'pcs', minQuantity: 30, costPrice: 0.50, supplierId: 'sup-1', category: 'Bakery' },
+  { id: 'inv-5', name: 'Lettuce', sku: 'VEG-001', quantity: 15, storageQuantity: 12, unit: 'heads', minQuantity: 10, costPrice: 1.50, supplierId: 'sup-1', category: 'Vegetables' },
+  { id: 'inv-6', name: 'Tomatoes', sku: 'VEG-002', quantity: 8, storageQuantity: 16, unit: 'kg', minQuantity: 5, costPrice: 2.50, supplierId: 'sup-1', category: 'Vegetables' },
+  { id: 'inv-7', name: 'Potatoes', sku: 'VEG-003', quantity: 40, storageQuantity: 60, unit: 'kg', minQuantity: 15, costPrice: 1.20, supplierId: 'sup-1', category: 'Vegetables' },
+  { id: 'inv-8', name: 'Coca-Cola', sku: 'BEV-001', quantity: 48, storageQuantity: 96, unit: 'cans', minQuantity: 24, costPrice: 0.80, supplierId: 'sup-2', category: 'Beverages' },
+  { id: 'inv-9', name: 'Coffee Beans', sku: 'BEV-002', quantity: 5, storageQuantity: 7, unit: 'kg', minQuantity: 3, costPrice: 25.00, supplierId: 'sup-2', category: 'Beverages' },
+  { id: 'inv-10', name: 'Cooking Oil', sku: 'MISC-001', quantity: 10, storageQuantity: 18, unit: 'L', minQuantity: 5, costPrice: 4.00, supplierId: 'sup-1', category: 'Supplies' },
+  { id: 'inv-11', name: 'Cheese Slices', sku: 'DAIRY-001', quantity: 3, storageQuantity: 9, unit: 'packs', minQuantity: 5, costPrice: 8.00, supplierId: 'sup-1', category: 'Dairy' },
+  { id: 'inv-12', name: 'Ice Cream (Vanilla)', sku: 'DAIRY-002', quantity: 8, storageQuantity: 12, unit: 'L', minQuantity: 4, costPrice: 12.00, supplierId: 'sup-1', category: 'Dairy' },
 ]
 
 export const mockOrders: Order[] = [

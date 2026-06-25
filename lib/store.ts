@@ -44,6 +44,37 @@ import {
 
 interface CartItem extends OrderItem {}
 
+function normalizeInventoryForApi(item: InventoryItem) {
+  return {
+    id: item.id,
+    name: item.name,
+    sku: item.sku,
+    quantity: item.quantity,
+    unit: item.unit,
+    minQuantity: item.minQuantity,
+    costPrice: item.costPrice,
+    supplierId: item.supplierId,
+    lastRestocked: item.lastRestocked,
+    category: item.category,
+  }
+}
+
+function normalizeInventoryPatchForApi(item: Partial<InventoryItem>) {
+  const patch: Partial<InventoryItem> = {
+    name: item.name,
+    sku: item.sku,
+    quantity: item.quantity,
+    unit: item.unit,
+    minQuantity: item.minQuantity,
+    costPrice: item.costPrice,
+    supplierId: item.supplierId,
+    lastRestocked: item.lastRestocked,
+    category: item.category,
+  }
+
+  return Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
+}
+
 interface POSStore {
   // Auth
   currentUser: User | null
@@ -273,12 +304,16 @@ export const usePOSStore = create<POSStore>()(
       suppliers: mockSuppliers,
       stockAdjustments: [],
       addInventoryItem: (item) => {
-        set((state) => ({ inventory: [...state.inventory, item] }))
-        dbSync('POST', '/api/inventory', item)
+        const normalized: InventoryItem = {
+          ...item,
+          storageQuantity: item.storageQuantity ?? 0,
+        }
+        set((state) => ({ inventory: [...state.inventory, normalized] }))
+        dbSync('POST', '/api/inventory', normalizeInventoryForApi(normalized))
       },
       updateInventoryItem: (id, itemData) => {
         set((state) => ({ inventory: state.inventory.map((i) => (i.id === id ? { ...i, ...itemData } : i)) }))
-        dbSync('PATCH', `/api/inventory/${id}`, itemData)
+        dbSync('PATCH', `/api/inventory/${id}`, normalizeInventoryPatchForApi(itemData))
       },
       deleteInventoryItem: (id) => {
         set((state) => ({ inventory: state.inventory.filter((i) => i.id !== id) }))
@@ -288,20 +323,67 @@ export const usePOSStore = create<POSStore>()(
         set((state) => {
           const item = state.inventory.find((i) => i.id === adjustment.inventoryItemId)
           if (!item) return state
-          const newQuantity =
-            adjustment.type === 'add'
-              ? item.quantity + adjustment.quantity
-              : item.quantity - adjustment.quantity
+          const currentStorage = item.storageQuantity ?? 0
+
+          let nextInventoryQty = item.quantity
+          let nextStorageQty = currentStorage
+
+          if (adjustment.type === 'transfer') {
+            if (adjustment.fromLocation === 'storage' && adjustment.toLocation === 'inventory') {
+              const moved = Math.min(currentStorage, adjustment.quantity)
+              nextStorageQty = currentStorage - moved
+              nextInventoryQty = item.quantity + moved
+            } else if (adjustment.fromLocation === 'inventory' && adjustment.toLocation === 'storage') {
+              const moved = Math.min(item.quantity, adjustment.quantity)
+              nextInventoryQty = item.quantity - moved
+              nextStorageQty = currentStorage + moved
+            }
+          } else {
+            const location = adjustment.location ?? 'inventory'
+            if (location === 'inventory') {
+              nextInventoryQty = adjustment.type === 'add'
+                ? item.quantity + adjustment.quantity
+                : item.quantity - adjustment.quantity
+            } else {
+              nextStorageQty = adjustment.type === 'add'
+                ? currentStorage + adjustment.quantity
+                : currentStorage - adjustment.quantity
+            }
+          }
+
+          nextInventoryQty = Math.max(0, nextInventoryQty)
+          nextStorageQty = Math.max(0, nextStorageQty)
+
           return {
             inventory: state.inventory.map((i) =>
               i.id === adjustment.inventoryItemId
-                ? { ...i, quantity: Math.max(0, newQuantity), lastRestocked: adjustment.type === 'add' ? new Date().toISOString() : i.lastRestocked }
+                ? {
+                    ...i,
+                    quantity: nextInventoryQty,
+                    storageQuantity: nextStorageQty,
+                    lastRestocked:
+                      adjustment.type === 'add' && (adjustment.location ?? 'inventory') === 'inventory'
+                        ? new Date().toISOString()
+                        : i.lastRestocked,
+                  }
                 : i
             ),
             stockAdjustments: [...state.stockAdjustments, adjustment],
           }
         })
-        dbSync('POST', '/api/stock-adjustments', adjustment)
+
+        // Keep DB sync compatible with current schema (daily inventory only)
+        if (adjustment.type !== 'transfer' && (adjustment.location ?? 'inventory') === 'inventory') {
+          dbSync('POST', '/api/stock-adjustments', {
+            id: adjustment.id,
+            inventoryItemId: adjustment.inventoryItemId,
+            type: adjustment.type,
+            quantity: adjustment.quantity,
+            reason: adjustment.reason,
+            createdAt: adjustment.createdAt,
+            createdBy: adjustment.createdBy,
+          })
+        }
       },
       addSupplier: (supplier) => {
         set((state) => ({ suppliers: [...state.suppliers, supplier] }))
@@ -338,15 +420,36 @@ export const usePOSStore = create<POSStore>()(
               fetch('/api/stock-adjustments').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               fetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
             ])
+          const currentInventory = get().inventory
+          const incomingInventory: InventoryItem[] = Array.isArray(inventory)
+            ? inventory.map((item: InventoryItem) => {
+                const existing = currentInventory.find((i) => i.id === item.id)
+                return {
+                  ...item,
+                  storageQuantity: item.storageQuantity ?? existing?.storageQuantity ?? 0,
+                }
+              })
+            : currentInventory
+
+          const mergedAdjustments = (() => {
+            const existing = get().stockAdjustments
+            const incoming = Array.isArray(stockAdjustments) ? stockAdjustments : []
+            const map = new Map<string, StockAdjustment>()
+            ;[...existing, ...incoming].forEach((adj: StockAdjustment) => {
+              map.set(adj.id, adj)
+            })
+            return Array.from(map.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+          })()
+
           set({
             users: Array.isArray(users) ? users : get().users,
             categories: Array.isArray(categories) ? categories : get().categories,
             menuItems: Array.isArray(menuItems) ? menuItems : get().menuItems,
             tables: Array.isArray(tables) ? tables : get().tables,
             orders: Array.isArray(orders) ? orders : get().orders,
-            inventory: Array.isArray(inventory) ? inventory : get().inventory,
+            inventory: incomingInventory,
             suppliers: Array.isArray(suppliers) ? suppliers : get().suppliers,
-            stockAdjustments: Array.isArray(stockAdjustments) ? stockAdjustments : get().stockAdjustments,
+            stockAdjustments: mergedAdjustments,
             settings: settings && !settings.error ? settings : get().settings,
           })
         } catch (e) {

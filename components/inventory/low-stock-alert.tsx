@@ -33,7 +33,7 @@ export function LowStockAlert() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-600" />
-            Low Stock Alert
+            Low Daily Stock Alert
           </CardTitle>
           <Badge variant="destructive" className="ml-2">
             {lowStockItems.length}

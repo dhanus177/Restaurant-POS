@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePOSStore } from '@/lib/store'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Store, Receipt, DollarSign, Save, Upload, X } from 'lucide-react'
+import { Store, Receipt, DollarSign, Save, Upload, X, Palette } from 'lucide-react'
 import Image from 'next/image'
+import { useTheme } from 'next-themes'
 
 const currencies = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -30,6 +31,12 @@ const currencies = [
 export default function SettingsPage() {
   const { settings, updateSettings } = usePOSStore()
   const [formData, setFormData] = useState(settings)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleSave = () => {
     updateSettings(formData)
@@ -188,6 +195,36 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Switch between Light, Dark, or System theme
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2">
+            <Label htmlFor="appearance">Theme Mode</Label>
+            {mounted && (
+              <Select value={theme ?? 'system'} onValueChange={(value) => setTheme(value)}>
+                <SelectTrigger id="appearance">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system">System</SelectItem>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </CardContent>
       </Card>

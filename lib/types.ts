@@ -106,7 +106,8 @@ export interface InventoryItem {
   id: string
   name: string
   sku: string
-  quantity: number
+  quantity: number // Daily operational stock (kitchen/front)
+  storageQuantity?: number // External storage stock
   unit: string
   minQuantity: number
   costPrice: number
@@ -119,6 +120,9 @@ export interface StockAdjustment {
   id: string
   inventoryItemId: string
   type: 'add' | 'remove' | 'waste' | 'transfer'
+  location?: 'inventory' | 'storage'
+  fromLocation?: 'inventory' | 'storage'
+  toLocation?: 'inventory' | 'storage'
   quantity: number
   reason: string
   createdAt: string

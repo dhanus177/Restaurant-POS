@@ -109,7 +109,9 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
               <TableHead>SKU</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Stock Level</TableHead>
-              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="text-right">Daily</TableHead>
+              <TableHead className="text-right">Storage</TableHead>
+              <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Cost</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
@@ -117,13 +119,15 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
           <TableBody>
             {filteredInventory.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No items found
                 </TableCell>
               </TableRow>
             ) : (
               filteredInventory.map((item) => {
                 const status = getStockStatus(item)
+                const storageQty = item.storageQuantity ?? 0
+                const totalQty = item.quantity + storageQty
                 return (
                   <TableRow key={item.id}>
                     <TableCell>
@@ -160,6 +164,12 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
                       <span className="text-xs text-muted-foreground block">
                         Min: {item.minQuantity}
                       </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {storageQty} {item.unit}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {totalQty} {item.unit}
                     </TableCell>
                     <TableCell className="text-right">
                       {settings.currencySymbol}
