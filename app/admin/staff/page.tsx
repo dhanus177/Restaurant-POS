@@ -118,7 +118,7 @@ export default function StaffManagementPage() {
       case 'kitchen':
         return 'bg-warning text-warning-foreground'
       case 'pay-counter':
-        return 'bg-emerald-600 text-white'
+        return 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
       default:
         return ''
     }

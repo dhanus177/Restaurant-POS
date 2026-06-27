@@ -257,11 +257,14 @@ export function CategoriesManager() {
                 </TableHeader>
                 <TableBody>
                   {categories.map((category, idx) => (
-                    <TableRow key={category.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-muted/20'}>
+                    <TableRow
+                      key={category.id}
+                      className={idx % 2 === 0 ? 'bg-card/80 dark:bg-card/80' : 'bg-muted/40 dark:bg-muted/20'}
+                    >
                       <TableCell>
                         <div
                           className="h-6 w-6 rounded border border-border"
-                        style={{ backgroundColor: category.color || '#000000' }}
+                          style={{ backgroundColor: category.color || '#000000' }}
                           title={category.color}
                         />
                       </TableCell>
@@ -274,7 +277,7 @@ export function CategoriesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(category)}
-                            className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                            className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20 dark:hover:text-blue-400"
                             title="Edit category"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -283,7 +286,7 @@ export function CategoriesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(category.id)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                             title="Delete category"
                           >
                             <Trash2 className="h-4 w-4" />

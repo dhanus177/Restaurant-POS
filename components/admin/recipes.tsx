@@ -307,7 +307,10 @@ export function RecipesManager() {
                 </TableHeader>
                 <TableBody>
                   {recipes.map((recipe, idx) => (
-                    <TableRow key={recipe.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-muted/20'}>
+                    <TableRow
+                      key={recipe.id}
+                      className={idx % 2 === 0 ? 'bg-card/80 dark:bg-card/80' : 'bg-muted/40 dark:bg-muted/20'}
+                    >
                       <TableCell className="font-medium text-foreground">{recipe.productName}</TableCell>
                       <TableCell className="text-foreground">{recipe.ingredientName}</TableCell>
                       <TableCell className="text-sm text-muted-foreground font-mono">{recipe.ingredientSku}</TableCell>
@@ -319,7 +322,7 @@ export function RecipesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(recipe)}
-                            className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600"
+                            className="h-8 w-8 p-0 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-500/20 dark:hover:text-blue-400"
                             title="Edit recipe"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -328,7 +331,7 @@ export function RecipesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(recipe.id)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600"
+                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                             title="Delete recipe"
                           >
                             <Trash2 className="h-4 w-4" />

@@ -115,28 +115,28 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-b from-amber-50 via-background to-background">
+    <div className="flex h-screen flex-col bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
       <Header title="Billing Counter" />
 
       <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-4 md:p-6">
-        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+        <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm dark:border-amber-900/40 dark:bg-card/80">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Bill counter</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">Bill counter</p>
               <h1 className="text-2xl font-bold text-foreground">Create, barcode, and hand over the bill</h1>
             </div>
             <div className="flex gap-2">
-              <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100">Billing</Badge>
+              <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/20">Billing</Badge>
               <Badge variant="outline">{currentCustomerCount} pax</Badge>
             </div>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-          <Card className="border-amber-200 shadow-sm">
-            <CardHeader className="bg-amber-50/70">
+          <Card className="border-amber-200 shadow-sm dark:border-amber-900/40">
+            <CardHeader className="bg-amber-50/70 dark:bg-card/70">
               <CardTitle className="flex items-center gap-2">
-                <ReceiptText className="h-5 w-5 text-amber-700" />
+                <ReceiptText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                 Bill Summary
               </CardTitle>
             </CardHeader>
@@ -146,7 +146,7 @@ export default function BillingPage() {
                 <Badge variant="outline">{currentOrderSource === 'diner-mobile' ? 'Diner Mobile' : 'Counter'}</Badge>
               </div>
 
-              <div className="rounded-xl bg-amber-50 p-4">
+              <div className="rounded-xl bg-amber-50 p-4 dark:bg-muted/30">
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span className="flex items-center gap-2"><Users className="h-4 w-4" /> Seating</span>
                   <span>{selectedTable ? selectedTable.name : 'Takeaway'}</span>
@@ -167,7 +167,7 @@ export default function BillingPage() {
                   </span>
                 </div>
                 {currentCustomerCount > 1 && (
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-background/90 px-3 py-2 text-sm text-amber-800">
+                  <div className="mt-3 flex items-center justify-between rounded-lg bg-background/90 px-3 py-2 text-sm text-amber-800 dark:bg-muted/40 dark:text-amber-200">
                     <span>Split / customer</span>
                     <span className="font-semibold">{settings.currencySymbol}{perCustomer.toFixed(2)}</span>
                   </div>
@@ -185,20 +185,20 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-amber-200 shadow-sm">
-            <CardHeader className="bg-amber-50/70">
+          <Card className="border-amber-200 shadow-sm dark:border-amber-900/40">
+            <CardHeader className="bg-amber-50/70 dark:bg-card/70">
               <CardTitle className="flex items-center gap-2">
-                <ScanBarcode className="h-5 w-5 text-amber-700" />
+                <ScanBarcode className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                 Bill Barcode
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 p-6">
-              <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-white p-4 text-center shadow-inner">
+              <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-background p-4 text-center shadow-inner dark:bg-card">
                 <p className="text-xs text-muted-foreground">Bill Code</p>
                 <p className="font-mono text-lg font-semibold tracking-widest">{billCode}</p>
-                <div className="mt-4 overflow-x-auto rounded-lg bg-white p-2" dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
+                <div className="mt-4 overflow-x-auto rounded-lg bg-background p-2 dark:bg-card" dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
               </div>
-              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                 Cash collector can search or scan this bill code at the pay counter.
               </p>
             </CardContent>
