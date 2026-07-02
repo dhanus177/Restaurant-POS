@@ -29,7 +29,7 @@ const currencies = [
 
 export default function CreateRestaurantPage() {
   const router = useRouter()
-  const { settings, updateSettings, setCurrentUser, loadFromDB } = usePOSStore()
+  const { currentUser, settings, updateSettings, setCurrentUser, loadFromDB } = usePOSStore()
 
   const initialData = useMemo(
     () => ({
@@ -50,16 +50,25 @@ export default function CreateRestaurantPage() {
   const [adminPin, setAdminPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [existingAdminId, setExistingAdminId] = useState<string | null>(null)
+  const [ownerExists, setOwnerExists] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
+
   useEffect(() => {
+    setFormData(initialData)
+  }, [initialData])
+
+  useEffect(() => {
+    void loadFromDB()
+
     const loadExistingAdmin = async () => {
       try {
-        const res = await fetch('/api/users')
+        const res = await fetch('/api/users', { credentials: 'same-origin' })
         if (!res.ok) return
         const users: Array<{ id: string; name: string; pin: string; role: string }> = await res.json()
-        const admin = users.find((u) => u.role === 'admin')
+        const admin = users.find((u) => u.role === 'super-admin') ?? users.find((u) => u.role === 'admin')
         if (!admin) return
+        setOwnerExists(true)
         setExistingAdminId(admin.id)
         setAdminName(admin.name)
       } catch {
@@ -67,8 +76,8 @@ export default function CreateRestaurantPage() {
       }
     }
 
-    loadExistingAdmin()
-  }, [])
+    void loadExistingAdmin()
+  }, [loadFromDB])
 
   const handleCurrencyChange = (code: string) => {
     const currency = currencies.find((c) => c.code === code)
@@ -81,6 +90,11 @@ export default function CreateRestaurantPage() {
   }
 
   const handleSave = async () => {
+    if (ownerExists && currentUser?.role !== 'super-admin') {
+      toast.error('Only the super admin can update restaurant ownership details')
+      return
+    }
+
     if (!formData.restaurantName.trim()) {
       toast.error('Restaurant name is required')
       return
@@ -105,6 +119,7 @@ export default function CreateRestaurantPage() {
     try {
       const settingsRes = await fetch('/api/settings', {
         method: 'PATCH',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
@@ -117,11 +132,12 @@ export default function CreateRestaurantPage() {
         id: existingAdminId ?? crypto.randomUUID(),
         name: adminName.trim(),
         pin: adminPin,
-        role: 'admin',
+        role: 'super-admin',
       }
 
       const adminRes = await fetch(existingAdminId ? `/api/users/${existingAdminId}` : '/api/users', {
         method: existingAdminId ? 'PATCH' : 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminPayload),
       })
@@ -132,11 +148,26 @@ export default function CreateRestaurantPage() {
 
       const savedAdmin = await adminRes.json()
 
+      if (!existingAdminId) {
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: adminPin }),
+        })
+
+        if (!loginRes.ok) {
+          throw new Error('Failed to sign in new super admin')
+        }
+
+        const loginData = await loginRes.json()
+        setCurrentUser(loginData.user)
+      }
+
       updateSettings(formData)
-      setCurrentUser(savedAdmin)
       await loadFromDB()
 
-      toast.success(existingAdminId ? 'Restaurant and admin updated successfully' : 'Restaurant and admin created successfully')
+      toast.success(existingAdminId ? 'Restaurant and super admin updated successfully' : 'Restaurant and super admin created successfully')
       router.push('/admin')
     } catch (error) {
       console.error(error)
@@ -159,6 +190,14 @@ export default function CreateRestaurantPage() {
             Back
           </Button>
         </div>
+
+        {ownerExists && currentUser?.role !== 'super-admin' && (
+          <Card className="border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-500/10">
+            <CardContent className="p-4 text-sm text-amber-900 dark:text-amber-100">
+              A super admin already exists. Please log in as the super admin to update restaurant information or ownership details.
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -310,13 +349,13 @@ export default function CreateRestaurantPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5" />
-              Admin Account
+              Super Admin Account
             </CardTitle>
-            <CardDescription>Create the admin login used to manage this POS</CardDescription>
+            <CardDescription>Create the owner login with full access to this POS</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2">
-              <Label htmlFor="admin-name">Admin Name *</Label>
+              <Label htmlFor="admin-name">Super Admin Name *</Label>
               <Input
                 id="admin-name"
                 value={adminName}
@@ -327,7 +366,7 @@ export default function CreateRestaurantPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="admin-pin">Admin PIN (4 digits) *</Label>
+                <Label htmlFor="admin-pin">Super Admin PIN (4 digits) *</Label>
                 <Input
                   id="admin-pin"
                   type="password"
@@ -356,9 +395,9 @@ export default function CreateRestaurantPage() {
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving} className="gap-2" size="lg">
+          <Button onClick={handleSave} disabled={isSaving || (ownerExists && currentUser?.role !== 'super-admin')} className="gap-2" size="lg">
             <Save className="h-4 w-4" />
-            {isSaving ? 'Saving...' : existingAdminId ? 'Update Setup' : 'Create Restaurant & Admin'}
+            {isSaving ? 'Saving...' : existingAdminId ? 'Update Setup' : 'Create Restaurant & Super Admin'}
           </Button>
         </div>
       </div>

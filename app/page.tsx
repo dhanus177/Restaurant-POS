@@ -6,22 +6,63 @@ import { usePOSStore } from '@/lib/store'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UtensilsCrossed, ChefHat, Settings, Lock, Delete, WalletCards } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Settings, Lock, Delete, WalletCards, ShoppingBag } from 'lucide-react'
+
+type SetupStatus = {
+  hasSettings: boolean
+  hasSuperAdmin: boolean
+  hasActiveLicense: boolean
+  setupComplete: boolean
+}
+
+const showDemoAccess = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { currentUser, loginWithPin, setCurrentUser, settings } = usePOSStore()
+  const { currentUser, loginWithPin, loadFromDB, settings } = usePOSStore()
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [checkingSetup, setCheckingSetup] = useState(true)
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
 
   useEffect(() => {
-    if (currentUser) {
+    void loadFromDB()
+
+    const loadSetupStatus = async () => {
+      try {
+        const response = await fetch('/api/setup/status', { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error('Failed to load setup status')
+        }
+
+        const status = (await response.json()) as SetupStatus
+        setSetupStatus(status)
+
+        if (!status.setupComplete) {
+          router.replace('/setup')
+          return
+        }
+      } catch (setupError) {
+        console.error(setupError)
+      } finally {
+        setCheckingSetup(false)
+      }
+    }
+
+    void loadSetupStatus()
+  }, [loadFromDB])
+
+  useEffect(() => {
+    if (!checkingSetup && setupStatus?.setupComplete && currentUser) {
       redirectToRole(currentUser.role)
     }
-  }, [currentUser])
+  }, [checkingSetup, currentUser, setupStatus])
 
   const redirectToRole = (role: string) => {
     switch (role) {
+      case 'super-admin':
+        router.push('/admin')
+        break
       case 'cashier':
         router.push('/pos')
         break
@@ -34,17 +75,23 @@ export default function LoginPage() {
       case 'pay-counter':
         router.push('/pay')
         break
+      case 'takeaway':
+        router.push('/takeaway')
+        break
+      default:
+        router.push('/pos')
+        break
     }
   }
 
-  const handlePinInput = (digit: string) => {
+  const handlePinInput = async (digit: string) => {
     if (pin.length < 4) {
       const newPin = pin + digit
       setPin(newPin)
       setError('')
       
       if (newPin.length === 4) {
-        const user = loginWithPin(newPin)
+        const user = await loginWithPin(newPin)
         if (user) {
           redirectToRole(user.role)
         } else {
@@ -65,17 +112,27 @@ export default function LoginPage() {
     setError('')
   }
 
-  const handleQuickLogin = (role: 'cashier' | 'kitchen' | 'admin' | 'pay-counter') => {
+  const handleQuickLogin = async (role: 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'pay-counter' | 'takeaway') => {
     const pins: Record<string, string> = {
       cashier: '2222',
       kitchen: '3333',
       admin: '1234',
+      'super-admin': '2111',
       'pay-counter': '5555',
+      takeaway: '6666',
     }
-    const user = loginWithPin(pins[role])
+    const user = await loginWithPin(pins[role])
     if (user) {
       redirectToRole(user.role)
     }
+  }
+
+  if (checkingSetup) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <p className="text-sm text-muted-foreground">Checking setup status...</p>
+      </div>
+    )
   }
 
   return (
@@ -154,52 +211,63 @@ export default function LoginPage() {
         </CardContent>
       </Card>
 
-      <div className="mt-8">
-        <p className="text-center text-sm text-muted-foreground mb-4">Quick Access </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2"
-            onClick={() => handleQuickLogin('cashier')}
-          >
-            <UtensilsCrossed className="h-5 w-5" />
-            Cashier
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2"
-            onClick={() => handleQuickLogin('kitchen')}
-          >
-            <ChefHat className="h-5 w-5" />
-            Kitchen
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2"
-            onClick={() => handleQuickLogin('admin')}
-          >
-            <Settings className="h-5 w-5" />
-            Admin
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className="gap-2"
-            onClick={() => handleQuickLogin('pay-counter')}
-          >
-            <WalletCards className="h-5 w-5" />
-            Pay Counter
-          </Button>
+      {showDemoAccess && (
+        <div className="mt-8">
+          <p className="mb-4 text-center text-sm text-muted-foreground">Quick Access</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('cashier')}
+            >
+              <UtensilsCrossed className="h-5 w-5" />
+              Cashier
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('kitchen')}
+            >
+              <ChefHat className="h-5 w-5" />
+              Kitchen
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('super-admin')}
+            >
+              <Settings className="h-5 w-5" />
+              Super Admin
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('pay-counter')}
+            >
+              <WalletCards className="h-5 w-5" />
+              Pay Counter
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('takeaway')}
+            >
+              <ShoppingBag className="h-5 w-5" />
+              Takeaway Counter
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-8 text-center text-xs text-muted-foreground">
         <div className="mb-3">
           <Button asChild variant="outline" size="sm">
-            <Link href="/restaurant/create">Create Restaurant</Link>
+            <Link href="/setup">Open Setup</Link>
           </Button>
         </div>
         <p>All Rights Reserved © {new Date().getFullYear()}</p>

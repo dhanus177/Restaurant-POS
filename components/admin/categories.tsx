@@ -36,6 +36,7 @@ export function CategoriesManager() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
 
   const [formData, setFormData] = useState({
     name: '',
@@ -50,7 +51,7 @@ export function CategoriesManager() {
   async function loadData() {
     try {
       setLoading(true)
-      const res = await fetch('/api/categories')
+      const res = await fetch('/api/categories', { credentials: 'same-origin' })
       if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`)
       const data = await res.json()
       setCategories(Array.isArray(data) ? data : [])
@@ -75,6 +76,7 @@ export function CategoriesManager() {
         // Update
         const res = await fetch(`/api/categories/${editingId}`, {
           method: 'PATCH',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: formData.name,
@@ -99,6 +101,7 @@ export function CategoriesManager() {
         // Create
         const res = await fetch('/api/categories', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: formData.name,
@@ -136,7 +139,7 @@ export function CategoriesManager() {
     if (!confirm('Delete this category?')) return
 
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE', credentials: 'same-origin' })
       if (!res.ok) throw new Error('Failed to delete')
       toast.success('Category deleted')
       await loadData()
@@ -162,10 +165,10 @@ export function CategoriesManager() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Categories</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Categories</h2>
           <p className="text-sm text-muted-foreground mt-1">Organize your menu items into categories</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -176,7 +179,7 @@ export function CategoriesManager() {
               <span className="sm:hidden">Add</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-full max-w-md mx-4 sm:mx-auto">
+          <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader>
               <DialogTitle className="text-xl">{editingId ? 'Edit Category' : 'Add New Category'}</DialogTitle>
             </DialogHeader>
@@ -218,7 +221,7 @@ export function CategoriesManager() {
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end pt-6">
+              <div className="sticky bottom-0 flex gap-2 justify-end border-t bg-background pt-6">
                 <Button type="button" variant="outline" onClick={handleCloseDialog} className="px-6">
                   Cancel
                 </Button>
@@ -227,6 +230,11 @@ export function CategoriesManager() {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
+        <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>Table</Button>
       </div>
 
       <Card className="border-0 shadow-sm">
@@ -243,9 +251,9 @@ export function CategoriesManager() {
             <div className="py-12 text-center">
               <p className="text-muted-foreground">No categories yet. Create one to get started.</p>
             </div>
-          ) : (
+          ) : viewMode === 'table' ? (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[680px]">
                 <TableHeader>
                   <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
                     <TableHead className="font-semibold text-foreground">Color</TableHead>
@@ -286,7 +294,7 @@ export function CategoriesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(category.id)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                            className="h-10 w-10 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                             title="Delete category"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -297,6 +305,31 @@ export function CategoriesManager() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {categories.map((category) => (
+                <Card key={category.id}>
+                  <CardContent className="p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded border border-border" style={{ backgroundColor: category.color || '#000000' }} />
+                        <span className="font-medium">{category.name}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">Order {category.order}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{category.description || '—'}</p>
+                    <div className="mt-3 flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(category)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => handleDelete(category.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>

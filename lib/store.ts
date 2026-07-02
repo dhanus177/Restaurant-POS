@@ -10,6 +10,7 @@ async function dbSync(method: string, url: string, body?: unknown) {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
     })
   } catch (e) {
     console.error('[db-sync error]', method, url, e)
@@ -83,7 +84,9 @@ interface POSStore {
   addUser: (user: User) => void
   updateUser: (id: string, user: Partial<User>) => void
   deleteUser: (id: string) => void
-  loginWithPin: (pin: string) => User | null
+  loginWithPin: (pin: string) => Promise<User | null>
+  logout: () => Promise<void>
+  refreshCurrentUser: () => Promise<User | null>
 
   // Menu
   categories: Category[]
@@ -171,13 +174,66 @@ export const usePOSStore = create<POSStore>()(
         set((state) => ({ users: state.users.filter((u) => u.id !== id) }))
         dbSync('DELETE', `/api/users/${id}`)
       },
-      loginWithPin: (pin) => {
-        const user = get().users.find((u) => u.pin === pin)
-        if (user) {
+      loginWithPin: async (pin) => {
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin }),
+            credentials: 'same-origin',
+          })
+
+          if (!response.ok) {
+            return null
+          }
+
+          const data = await response.json()
+          if (!data?.user) {
+            return null
+          }
+
+          set({ currentUser: data.user })
+          await get().loadFromDB()
+          return data.user
+        } catch (error) {
+          console.error('[login error]', error)
+          return null
+        }
+      },
+      logout: async () => {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+          })
+        } catch (error) {
+          console.error('[logout error]', error)
+        } finally {
+          set({ currentUser: null })
+        }
+      },
+      refreshCurrentUser: async () => {
+        try {
+          const response = await fetch('/api/auth/me', {
+            method: 'GET',
+            cache: 'no-store',
+            credentials: 'same-origin',
+          })
+
+          if (!response.ok) {
+            set({ currentUser: null })
+            return null
+          }
+
+          const data = await response.json()
+          const user = data?.user ?? null
           set({ currentUser: user })
           return user
+        } catch (error) {
+          console.error('[refreshCurrentUser error]', error)
+          set({ currentUser: null })
+          return null
         }
-        return null
       },
 
       // Menu
@@ -408,17 +464,18 @@ export const usePOSStore = create<POSStore>()(
       // DB sync
       loadFromDB: async () => {
         try {
+          await get().refreshCurrentUser()
           const [users, categories, menuItems, tables, orders, inventory, suppliers, stockAdjustments, settings] =
             await Promise.all([
-              fetch('/api/users').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/categories').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/menu-items').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/tables').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/orders').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/inventory').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/suppliers').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/stock-adjustments').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/users', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/categories', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/menu-items', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/tables', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/orders', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/inventory', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/suppliers', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/stock-adjustments', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              fetch('/api/settings', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
             ])
           const currentInventory = get().inventory
           const incomingInventory: InventoryItem[] = Array.isArray(inventory)

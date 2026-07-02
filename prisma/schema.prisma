@@ -8,10 +8,11 @@ datasource db {
 }
 
 model User {
-  id   String @id
-  name String
-  pin  String
-  role String
+  id       String    @id
+  name     String
+  pin      String
+  role     String
+  sessions Session[]
 }
 
 model Category {
@@ -153,4 +154,26 @@ model Settings {
   currencySymbol String
   receiptFooter  String
   logo           String?
+}
+
+model License {
+  id            String   @id @default("singleton")
+  activationKey String   @unique
+  status        String
+  tier          String   @default("standard")
+  issuedAt      DateTime @default(now())
+  activatedAt   DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

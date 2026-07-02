@@ -60,12 +60,16 @@ export function RecipesManager() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
 
   const [formData, setFormData] = useState({
     productId: '',
     ingredientId: '',
     quantity: '',
   })
+  const [ingredientRows, setIngredientRows] = useState<Array<{ ingredientId: string; quantity: string }>>([
+    { ingredientId: '', quantity: '' },
+  ])
 
   useEffect(() => {
     loadData()
@@ -75,9 +79,9 @@ export function RecipesManager() {
     try {
       setLoading(true)
       const [recipesRes, menuRes, invRes] = await Promise.all([
-        fetch('/api/product-recipes'),
-        fetch('/api/menu-items'),
-        fetch('/api/inventory'),
+        fetch('/api/product-recipes', { credentials: 'same-origin' }),
+        fetch('/api/menu-items', { credentials: 'same-origin' }),
+        fetch('/api/inventory', { credentials: 'same-origin' }),
       ])
 
       if (!recipesRes.ok) throw new Error(`Failed to fetch recipes: ${recipesRes.status}`)
@@ -102,16 +106,17 @@ export function RecipesManager() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!formData.productId || !formData.ingredientId || !formData.quantity) {
-      toast.error('Please fill all fields')
-      return
-    }
-
     try {
       if (editingId) {
+        if (!formData.productId || !formData.ingredientId || !formData.quantity) {
+          toast.error('Please fill all fields')
+          return
+        }
+
         // Update
         const res = await fetch(`/api/product-recipes/${editingId}`, {
           method: 'PATCH',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity: parseFloat(formData.quantity) }),
         })
@@ -129,32 +134,73 @@ export function RecipesManager() {
 
         toast.success('Recipe updated')
       } else {
-        // Create
-        const res = await fetch('/api/product-recipes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            productId: formData.productId,
-            ingredientId: formData.ingredientId,
-            quantity: parseFloat(formData.quantity),
-          }),
-        })
-
-        if (!res.ok) {
-          let errorMsg = 'Failed to create recipe'
-          try {
-            const error = await res.json()
-            errorMsg = error.error || errorMsg
-          } catch (e) {
-            // Response body is not JSON or empty
-          }
-          throw new Error(errorMsg)
+        if (!formData.productId) {
+          toast.error('Please select a menu item')
+          return
         }
 
-        toast.success('Recipe created')
+        const validRows = ingredientRows.filter((row) => row.ingredientId && parseFloat(row.quantity) > 0)
+        if (validRows.length === 0) {
+          toast.error('Add at least one ingredient with quantity')
+          return
+        }
+
+        const duplicateIngredient = (() => {
+          const seen = new Set<string>()
+          for (const row of validRows) {
+            if (seen.has(row.ingredientId)) return true
+            seen.add(row.ingredientId)
+          }
+          return false
+        })()
+
+        if (duplicateIngredient) {
+          toast.error('Duplicate ingredients found. Use each ingredient once per menu item.')
+          return
+        }
+
+        const creationResults = await Promise.all(
+          validRows.map(async (row) => {
+            const res = await fetch('/api/product-recipes', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                productId: formData.productId,
+                ingredientId: row.ingredientId,
+                quantity: parseFloat(row.quantity),
+              }),
+            })
+
+            if (!res.ok) {
+              let errorMsg = 'Failed to create recipe'
+              try {
+                const error = await res.json()
+                errorMsg = error.error || errorMsg
+              } catch (e) {
+                // Response body is not JSON or empty
+              }
+              return { ok: false, errorMsg }
+            }
+
+            return { ok: true as const }
+          })
+        )
+
+        const createdCount = creationResults.filter((result) => result.ok).length
+        const failedCount = creationResults.length - createdCount
+
+        if (createdCount > 0) {
+          toast.success(`Added ${createdCount} ingredient${createdCount > 1 ? 's' : ''} to menu item`)
+        }
+        if (failedCount > 0) {
+          const firstError = creationResults.find((result) => !result.ok)
+          toast.error(`${failedCount} ingredient${failedCount > 1 ? 's' : ''} failed: ${firstError?.errorMsg ?? 'Unknown error'}`)
+        }
       }
 
       setFormData({ productId: '', ingredientId: '', quantity: '' })
+      setIngredientRows([{ ingredientId: '', quantity: '' }])
       setEditingId(null)
       setDialogOpen(false)
       await loadData()
@@ -168,7 +214,7 @@ export function RecipesManager() {
     if (!confirm('Delete this recipe?')) return
 
     try {
-      const res = await fetch(`/api/product-recipes/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/product-recipes/${id}`, { method: 'DELETE', credentials: 'same-origin' })
       if (!res.ok) throw new Error('Failed to delete')
       toast.success('Recipe deleted')
       await loadData()
@@ -191,26 +237,34 @@ export function RecipesManager() {
     setDialogOpen(false)
     setEditingId(null)
     setFormData({ productId: '', ingredientId: '', quantity: '' })
+    setIngredientRows([{ ingredientId: '', quantity: '' }])
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-3 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex-1">
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Product Recipes</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Product Recipes</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage menu items and their required ingredients</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingId(null)} className="gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => {
+                setEditingId(null)
+                setFormData({ productId: '', ingredientId: '', quantity: '' })
+                setIngredientRows([{ ingredientId: '', quantity: '' }])
+              }}
+              className="gap-2 w-full sm:w-auto"
+            >
               <Plus className="h-5 w-5" />
               <span className="hidden sm:inline">Add Recipe</span>
               <span className="sm:hidden">Add</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-full max-w-md mx-4 sm:mx-auto">
+          <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-xl">{editingId ? 'Edit Recipe' : 'Add New Recipe'}</DialogTitle>
+              <DialogTitle className="text-xl">{editingId ? 'Edit Recipe' : 'Add Ingredients to Menu Item'}</DialogTitle>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-5 py-4">
@@ -230,44 +284,115 @@ export function RecipesManager() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ingredient" className="text-sm font-medium">Ingredient <span className="text-red-500">*</span></Label>
-                <Select value={formData.ingredientId} onValueChange={(v) => setFormData({ ...formData, ingredientId: v })}>
-                  <SelectTrigger id="ingredient" disabled={Boolean(editingId)} className="h-10">
-                    <SelectValue placeholder="Select ingredient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {inventory.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.unit})
-                      </SelectItem>
+              {editingId ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="ingredient" className="text-sm font-medium">Ingredient <span className="text-red-500">*</span></Label>
+                    <Select value={formData.ingredientId} onValueChange={(v) => setFormData({ ...formData, ingredientId: v })}>
+                      <SelectTrigger id="ingredient" disabled className="h-10">
+                        <SelectValue placeholder="Select ingredient" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {inventory.map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} ({item.unit})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity" className="text-sm font-medium">
+                      Quantity Required <span className="text-red-500">*</span>
+                      {formData.ingredientId && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({inventory.find((i) => i.id === formData.ingredientId)?.unit})
+                        </span>
+                      )}
+                    </Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="e.g., 2"
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                      className="h-10"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Ingredients <span className="text-red-500">*</span></Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIngredientRows((prev) => [...prev, { ingredientId: '', quantity: '' }])}
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add Ingredient
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {ingredientRows.map((row, index) => (
+                      <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_110px_auto]">
+                        <Select
+                          value={row.ingredientId}
+                          onValueChange={(v) =>
+                            setIngredientRows((prev) =>
+                              prev.map((r, i) => (i === index ? { ...r, ingredientId: v } : r))
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select ingredient" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {inventory.map((item) => (
+                              <SelectItem key={item.id} value={item.id}>
+                                {item.name} ({item.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="Qty"
+                          value={row.quantity}
+                          onChange={(e) =>
+                            setIngredientRows((prev) =>
+                              prev.map((r, i) => (i === index ? { ...r, quantity: e.target.value } : r))
+                            )
+                          }
+                          className="h-10"
+                        />
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={ingredientRows.length === 1}
+                          onClick={() =>
+                            setIngredientRows((prev) => prev.filter((_, i) => i !== index))
+                          }
+                          title="Remove ingredient"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="quantity" className="text-sm font-medium">
-                  Quantity Required <span className="text-red-500">*</span>
-                  {formData.ingredientId && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      ({inventory.find((i) => i.id === formData.ingredientId)?.unit})
-                    </span>
-                  )}
-                </Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="e.g., 2"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                  className="h-10"
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-6">
+              <div className="sticky bottom-0 flex gap-2 justify-end border-t bg-background pt-6">
                 <Button type="button" variant="outline" onClick={handleCloseDialog} className="px-6">
                   Cancel
                 </Button>
@@ -276,6 +401,11 @@ export function RecipesManager() {
             </form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
+        <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>Table</Button>
       </div>
 
       <Card className="border-0 shadow-sm">
@@ -292,9 +422,9 @@ export function RecipesManager() {
             <div className="py-12 text-center">
               <p className="text-muted-foreground">No recipes yet. Create one to get started.</p>
             </div>
-          ) : (
+          ) : viewMode === 'table' ? (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[760px]">
                 <TableHeader>
                   <TableRow className="border-b bg-muted/30 hover:bg-muted/30">
                     <TableHead className="font-semibold text-foreground">Menu Item</TableHead>
@@ -331,7 +461,7 @@ export function RecipesManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(recipe.id)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
+                            className="h-10 w-10 p-0 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:text-red-400"
                             title="Delete recipe"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -342,6 +472,27 @@ export function RecipesManager() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {recipes.map((recipe) => (
+                <Card key={recipe.id}>
+                  <CardContent className="p-4">
+                    <p className="font-medium">{recipe.productName}</p>
+                    <p className="text-sm text-muted-foreground">{recipe.ingredientName} ({recipe.ingredientUnit})</p>
+                    <p className="mt-1 text-xs text-muted-foreground font-mono">SKU: {recipe.ingredientSku}</p>
+                    <p className="mt-2 text-sm">Qty: <span className="font-semibold">{recipe.quantity}</span></p>
+                    <div className="mt-3 flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(recipe)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => handleDelete(recipe.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </CardContent>

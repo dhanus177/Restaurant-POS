@@ -12,14 +12,20 @@ import {
   mockSuppliers,
   mockProductRecipes,
 } from '@/lib/mock-data'
+import { allowSeedInProduction, isProduction, productionBlockResponse } from '@/lib/server-guards'
 
 export async function POST(req: Request) {
   try {
+    if (isProduction() && !allowSeedInProduction()) {
+      return productionBlockResponse('Database seeding')
+    }
+
     const { searchParams } = new URL(req.url)
     const force = searchParams.get('force') === '1' || searchParams.get('force') === 'true'
 
     if (force) {
       await prisma.$transaction([
+        prisma.license.deleteMany(),
         prisma.stockAdjustment.deleteMany(),
         prisma.productRecipe.deleteMany(),
         prisma.orderItem.deleteMany(),
