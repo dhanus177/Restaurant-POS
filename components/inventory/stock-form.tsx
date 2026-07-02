@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useEffect, useMemo, useState } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { usePOSStore } from '@/lib/store'
+import { getInventoryCategories, normalizeInventoryCategory } from '@/lib/inventory-categories'
 import type { InventoryItem } from '@/lib/types'
 
 interface StockFormProps {
@@ -21,11 +22,11 @@ interface StockFormProps {
   onClose: () => void
 }
 
-const categories = ['Meat', 'Seafood', 'Vegetables', 'Dairy', 'Bakery', 'Beverages', 'Supplies']
 const units = ['kg', 'g', 'L', 'ml', 'pcs', 'packs', 'boxes', 'cans', 'bottles', 'heads']
+const CUSTOM_CATEGORY_VALUE = '__custom__'
 
 export function StockForm({ item, open, onClose }: StockFormProps) {
-  const { suppliers, addInventoryItem, updateInventoryItem } = usePOSStore()
+  const { suppliers, inventory, addInventoryItem, updateInventoryItem } = usePOSStore()
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
@@ -37,6 +38,10 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
     category: 'Supplies',
     supplierId: '',
   })
+  const [customCategory, setCustomCategory] = useState('')
+  const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false)
+
+  const categories = useMemo(() => getInventoryCategories(inventory), [inventory])
 
   useEffect(() => {
     if (item) {
@@ -51,6 +56,8 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
         category: item.category,
         supplierId: item.supplierId || '',
       })
+      setCustomCategory('')
+      setIsCustomCategoryMode(false)
     } else {
       setFormData({
         name: '',
@@ -63,18 +70,33 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
         category: 'Supplies',
         supplierId: '',
       })
+      setCustomCategory('')
+      setIsCustomCategoryMode(false)
     }
   }, [item])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    const nextCategory = normalizeInventoryCategory(
+      isCustomCategoryMode ? customCategory : formData.category
+    )
+
+    if (!nextCategory) {
+      return
+    }
+
+    const nextFormData = {
+      ...formData,
+      category: nextCategory,
+    }
+
     if (item) {
-      updateInventoryItem(item.id, formData)
+      updateInventoryItem(item.id, nextFormData)
     } else {
       addInventoryItem({
         id: `inv-${Date.now()}`,
-        ...formData,
+        ...nextFormData,
         lastRestocked: new Date().toISOString(),
       })
     }
@@ -87,6 +109,11 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{item ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+          <DialogDescription>
+            {item
+              ? 'Update inventory item details, category, stock thresholds, and supplier information.'
+              : 'Create a new inventory item and assign it to an inventory category.'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -115,8 +142,18 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
               <div className="grid gap-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  value={isCustomCategoryMode ? CUSTOM_CATEGORY_VALUE : formData.category}
+                  onValueChange={(value) => {
+                    if (value === CUSTOM_CATEGORY_VALUE) {
+                      setIsCustomCategoryMode(true)
+                      setCustomCategory('')
+                      return
+                    }
+
+                    setIsCustomCategoryMode(false)
+                    setCustomCategory('')
+                    setFormData({ ...formData, category: value })
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -127,10 +164,24 @@ export function StockForm({ item, open, onClose }: StockFormProps) {
                         {cat}
                       </SelectItem>
                     ))}
+                    <SelectItem value={CUSTOM_CATEGORY_VALUE}>+ Create new category</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {isCustomCategoryMode && (
+              <div className="grid gap-2">
+                <Label htmlFor="custom-category">New Category</Label>
+                <Input
+                  id="custom-category"
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="e.g., Frozen Goods"
+                  required
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { usePOSStore } from '@/lib/store'
+import { getInventoryCategories } from '@/lib/inventory-categories'
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ import type { InventoryItem } from '@/lib/types'
 
 interface StockTableProps {
   onEdit: (item: InventoryItem) => void
-  onAdjust: (item: InventoryItem) => void
+  onAdjust: (item: InventoryItem, mode: 'add' | 'remove' | 'waste' | 'transfer') => void
   onDelete: (item: InventoryItem) => void
 }
 
@@ -34,7 +35,7 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
-  const categories = [...new Set(inventory.map((item) => item.category))]
+  const categories = getInventoryCategories(inventory)
 
   const filteredInventory = inventory.filter((item) => {
     const matchesSearch =
@@ -101,8 +102,8 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border border-border">
-        <Table>
+      <div className="rounded-lg border border-border overflow-x-auto">
+        <Table className="min-w-[920px]">
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
@@ -183,13 +184,17 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onAdjust(item)} className="gap-2">
+                          <DropdownMenuItem onClick={() => onAdjust(item, 'add')} className="gap-2">
                             <Plus className="h-4 w-4" />
                             Add Stock
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onAdjust(item)} className="gap-2">
+                          <DropdownMenuItem onClick={() => onAdjust(item, 'remove')} className="gap-2">
                             <Minus className="h-4 w-4" />
                             Remove Stock
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => onAdjust(item, 'waste')} className="gap-2">
+                            <Trash2 className="h-4 w-4" />
+                            Record Waste
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEdit(item)} className="gap-2">
                             <Pencil className="h-4 w-4" />

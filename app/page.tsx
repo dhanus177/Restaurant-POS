@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { apiFetch } from '@/lib/api'
 import { usePOSStore } from '@/lib/store'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,8 @@ type SetupStatus = {
   hasSuperAdmin: boolean
   hasActiveLicense: boolean
   setupComplete: boolean
+  requiresActivationOnly?: boolean
+  isPartiallyConfigured?: boolean
 }
 
 const showDemoAccess = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
@@ -30,7 +33,7 @@ export default function LoginPage() {
 
     const loadSetupStatus = async () => {
       try {
-        const response = await fetch('/api/setup/status', { cache: 'no-store' })
+        const response = await apiFetch('/api/setup/status', { cache: 'no-store' })
         if (!response.ok) {
           throw new Error('Failed to load setup status')
         }
@@ -131,6 +134,43 @@ export default function LoginPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <p className="text-sm text-muted-foreground">Checking setup status...</p>
+      </div>
+    )
+  }
+
+  if (setupStatus && !setupStatus.setupComplete) {
+    const setupMessage = setupStatus.requiresActivationOnly
+      ? 'This restaurant already has a super admin account, but the license still needs to be activated before normal sign-in is available.'
+      : setupStatus.isPartiallyConfigured
+        ? 'This instance is partially configured. Open setup to finish activation and review the existing configuration.'
+        : 'This instance still needs to be configured before staff can sign in.'
+
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center gap-2">
+              <Lock className="h-5 w-5" />
+              Setup required
+            </CardTitle>
+            <CardDescription>{setupMessage}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/10 dark:text-amber-100">
+              {setupStatus.requiresActivationOnly
+                ? 'Super admin authentication is working, but the license gate is still closed. Activate the license to continue.'
+                : 'Finish the guided setup before using the PIN login screen.'}
+            </div>
+            <div className="flex justify-center">
+              <Button asChild size="lg" className="gap-2">
+                <Link href="/setup">
+                  <Settings className="h-5 w-5" />
+                  Open setup
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }

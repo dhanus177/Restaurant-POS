@@ -22,12 +22,12 @@ export default function AdminLayout({
   useEffect(() => {
     if (mounted && !currentUser) {
       router.push('/')
-    } else if (mounted && currentUser?.role !== 'admin') {
+    } else if (mounted && !['admin', 'super-admin'].includes(currentUser?.role ?? '')) {
       router.push('/pos')
     }
   }, [currentUser, mounted, router])
 
-  if (!mounted || !currentUser || currentUser.role !== 'admin') {
+  if (!mounted || !currentUser || !['admin', 'super-admin'].includes(currentUser.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -36,9 +36,9 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       <Header title="Admin" />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         <AdminSidebar />
         <main className="flex-1 overflow-auto">
           <div className="h-full w-full">

@@ -46,7 +46,7 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-[95vw] md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Select Table</DialogTitle>
         </DialogHeader>
@@ -82,11 +82,11 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             <Button
               variant={selectedTable === null ? 'default' : 'outline'}
               className={cn(
-                'h-20 flex-col gap-1',
+                'h-24 flex-col gap-1',
                 selectedTable === null && 'bg-primary text-primary-foreground'
               )}
               onClick={() => handleSelectTable(null)}
@@ -100,7 +100,7 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
                 key={table.id}
                 variant="outline"
                 className={cn(
-                  'h-20 flex-col gap-1 transition-colors',
+                  'h-24 flex-col gap-1 transition-colors',
                   getStatusColor(table.status),
                   selectedTable?.id === table.id && 'ring-2 ring-primary',
                   (table.status !== 'available' || table.seats < currentCustomerCount) && 'cursor-not-allowed opacity-60'

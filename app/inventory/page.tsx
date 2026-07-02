@@ -32,6 +32,7 @@ export default function InventoryPage() {
   const [showAdjustment, setShowAdjustment] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
+  const [adjustmentMode, setAdjustmentMode] = useState<'add' | 'remove' | 'waste' | 'transfer'>('add')
 
   useEffect(() => {
     setMounted(true)
@@ -40,7 +41,7 @@ export default function InventoryPage() {
   useEffect(() => {
     if (mounted && !currentUser) {
       router.push('/')
-    } else if (mounted && currentUser?.role !== 'admin') {
+    } else if (mounted && !['admin', 'super-admin'].includes(currentUser?.role ?? '')) {
       router.push('/pos')
     }
   }, [currentUser, mounted, router])
@@ -59,8 +60,9 @@ export default function InventoryPage() {
     setShowForm(true)
   }
 
-  const handleAdjust = (item: InventoryItem) => {
+  const handleAdjust = (item: InventoryItem, mode: 'add' | 'remove' | 'waste' | 'transfer') => {
     setSelectedItem(item)
+    setAdjustmentMode(mode)
     setShowAdjustment(true)
   }
 
@@ -78,7 +80,7 @@ export default function InventoryPage() {
     }
   }
 
-  if (!mounted || !currentUser || currentUser.role !== 'admin') {
+  if (!mounted || !currentUser || !['admin', 'super-admin'].includes(currentUser.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -87,13 +89,13 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       <Header title="Inventory Management" />
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -185,7 +187,7 @@ export default function InventoryPage() {
                     : `${adjustment.type} @ ${adjustment.location ?? 'inventory'}`
 
                   return (
-                    <div key={adjustment.id} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                    <div key={adjustment.id} className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="font-medium">{itemName}</p>
                         <p className="text-muted-foreground">{movementLabel} • {adjustment.reason}</p>
@@ -202,12 +204,12 @@ export default function InventoryPage() {
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold">Inventory Items</h2>
             <Button onClick={() => {
               setSelectedItem(null)
               setShowForm(true)
-            }} className="gap-2">
+            }} className="w-full gap-2 sm:w-auto">
               <Plus className="h-4 w-4" />
               Add Item
             </Button>
@@ -234,10 +236,12 @@ export default function InventoryPage() {
 
       <StockAdjustmentDialog
         item={selectedItem}
+        initialType={adjustmentMode}
         open={showAdjustment}
         onClose={() => {
           setShowAdjustment(false)
           setSelectedItem(null)
+          setAdjustmentMode('add')
         }}
       />
 

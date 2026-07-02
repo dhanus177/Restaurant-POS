@@ -6,22 +6,35 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Minus, Plus, Trash2, MessageSquare } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { useState } from 'react'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { useMemo, useState } from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 
 interface CartProps {
   onCreateBill: () => void
   onSelectTable: () => void
+  className?: string
 }
 
-export function Cart({ onCreateBill, onSelectTable }: CartProps) {
+export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
   const {
     cart,
     selectedTable,
+    customers,
+    selectedCustomer,
     settings,
-    currentOrderSource,
     currentCustomerCount,
-    setCurrentOrderSource,
+    setSelectedCustomer,
+    createCustomer,
     removeFromCart,
     updateCartItemQuantity,
     updateCartItemNotes,
@@ -30,8 +43,23 @@ export function Cart({ onCreateBill, onSelectTable }: CartProps) {
   } = usePOSStore()
   const [editingNotes, setEditingNotes] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddName, setQuickAddName] = useState('')
+  const [quickAddPhone, setQuickAddPhone] = useState('')
+  const [quickAddEmail, setQuickAddEmail] = useState('')
+  const [quickAddNotes, setQuickAddNotes] = useState('')
+  const [quickAddSaving, setQuickAddSaving] = useState(false)
 
   const { subtotal, tax, total } = getCartTotal()
+  const filteredCustomers = useMemo(() => {
+    const query = customerSearch.trim().toLowerCase()
+    if (!query) return customers
+    return customers.filter((customer) => {
+      const haystack = `${customer.name} ${customer.phone ?? ''} ${customer.email ?? ''}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [customerSearch, customers])
 
   const handleEditNotes = (itemId: string, currentNotes?: string) => {
     setEditingNotes(itemId)
@@ -44,8 +72,44 @@ export function Cart({ onCreateBill, onSelectTable }: CartProps) {
     setNoteText('')
   }
 
+  const resetQuickAdd = () => {
+    setQuickAddName('')
+    setQuickAddPhone('')
+    setQuickAddEmail('')
+    setQuickAddNotes('')
+  }
+
+  const handleQuickAddCustomer = async () => {
+    if (!quickAddName.trim()) {
+      toast.error('Customer name is required')
+      return
+    }
+
+    setQuickAddSaving(true)
+    try {
+      const customer = await createCustomer({
+        name: quickAddName.trim(),
+        phone: quickAddPhone.trim() || undefined,
+        email: quickAddEmail.trim() || undefined,
+        notes: quickAddNotes.trim() || undefined,
+      })
+
+      if (!customer) {
+        toast.error('Failed to create customer')
+        return
+      }
+
+      setSelectedCustomer(customer)
+      setQuickAddOpen(false)
+      resetQuickAdd()
+      toast.success(`Customer added: ${customer.name}`)
+    } finally {
+      setQuickAddSaving(false)
+    }
+  }
+
   return (
-    <div className="flex h-full flex-col bg-card border-l border-border">
+    <div className={cn('flex h-full flex-col bg-card border-l border-border', className)}>
       {/* Header */}
       <div className="border-b border-border p-4">
         <div className="flex items-center justify-between">
@@ -66,19 +130,104 @@ export function Cart({ onCreateBill, onSelectTable }: CartProps) {
           {selectedTable ? `Table: ${selectedTable.name}` : 'Select Table (Optional)'}
         </Button>
 
-        <ToggleGroup
-          type="single"
-          value={currentOrderSource}
-          onValueChange={(value) => {
-            if (value === 'counter' || value === 'diner-mobile') {
-              setCurrentOrderSource(value)
-            }
-          }}
-          className="mt-2 grid grid-cols-2"
-        >
-          <ToggleGroupItem value="counter" className="text-xs">Billing Counter</ToggleGroupItem>
-          <ToggleGroupItem value="diner-mobile" className="text-xs">Diner Mobile App</ToggleGroupItem>
-        </ToggleGroup>
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Customer</span>
+            <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+              <DialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  Quick Add
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Customer</DialogTitle>
+                  <DialogDescription>Create a customer and attach them to this order.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-customer-name">Name</Label>
+                    <Input
+                      id="quick-customer-name"
+                      value={quickAddName}
+                      onChange={(e) => setQuickAddName(e.target.value)}
+                      placeholder="Customer name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-customer-phone">Phone</Label>
+                    <Input
+                      id="quick-customer-phone"
+                      value={quickAddPhone}
+                      onChange={(e) => setQuickAddPhone(e.target.value)}
+                      placeholder="555-0101"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-customer-email">Email</Label>
+                    <Input
+                      id="quick-customer-email"
+                      value={quickAddEmail}
+                      onChange={(e) => setQuickAddEmail(e.target.value)}
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quick-customer-notes">Notes</Label>
+                    <Input
+                      id="quick-customer-notes"
+                      value={quickAddNotes}
+                      onChange={(e) => setQuickAddNotes(e.target.value)}
+                      placeholder="Preferences, reminders"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setQuickAddOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="button" onClick={handleQuickAddCustomer} disabled={quickAddSaving}>
+                    {quickAddSaving ? 'Saving...' : 'Save Customer'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <Input
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            placeholder="Search customers by name/phone"
+            className="h-8"
+          />
+          <Select
+            value={selectedCustomer?.id ?? 'walk-in'}
+            onValueChange={(value) => {
+              if (value === 'walk-in') {
+                setSelectedCustomer(null)
+                return
+              }
+
+              const customer = customers.find((entry) => entry.id === value) ?? null
+              setSelectedCustomer(customer)
+            }}
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Walk-in customer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="walk-in">Walk-in customer</SelectItem>
+              {filteredCustomers.map((customer) => (
+                <SelectItem key={customer.id} value={customer.id}>
+                  {customer.name}{customer.phone ? ` • ${customer.phone}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedCustomer?.notes && (
+            <p className="text-xs text-muted-foreground">Note: {selectedCustomer.notes}</p>
+          )}
+        </div>
       </div>
 
       {/* Cart Items */}

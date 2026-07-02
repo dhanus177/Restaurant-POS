@@ -23,9 +23,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 
 export function MenuGrid({ onSelectItem }: MenuGridProps) {
   const { categories, menuItems, settings } = usePOSStore()
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(
-    categories[0]?.id || null
-  )
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order)
   const filteredItems = selectedCategory
@@ -36,15 +34,26 @@ export function MenuGrid({ onSelectItem }: MenuGridProps) {
     <div className="flex h-full flex-col">
       {/* Category Tabs */}
       <div className="border-b border-border p-2">
-        <ScrollArea className="w-full">
-          <div className="flex gap-2">
+        <div className="overflow-x-auto pb-1">
+          <div className="flex min-w-max gap-2 pr-2">
+            <Button
+              variant={selectedCategory === null ? 'default' : 'secondary'}
+              size="sm"
+              className={cn(
+                'h-10 flex-shrink-0 gap-2 px-4 sm:h-11 sm:px-6',
+                selectedCategory === null && 'bg-primary text-primary-foreground'
+              )}
+              onClick={() => setSelectedCategory(null)}
+            >
+              All
+            </Button>
             {sortedCategories.map((category) => (
               <Button
                 key={category.id}
                 variant={selectedCategory === category.id ? 'default' : 'secondary'}
-                size="lg"
+                size="sm"
                 className={cn(
-                  'flex-shrink-0 gap-2 px-6',
+                  'h-10 flex-shrink-0 gap-2 px-4 sm:h-11 sm:px-6',
                   selectedCategory === category.id && 'bg-primary text-primary-foreground'
                 )}
                 onClick={() => setSelectedCategory(category.id)}
@@ -54,18 +63,18 @@ export function MenuGrid({ onSelectItem }: MenuGridProps) {
               </Button>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Menu Items Grid */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <ScrollArea className="flex-1 p-3 sm:p-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           {filteredItems.map((item) => (
             <Button
               key={item.id}
               variant="outline"
               className={cn(
-                'h-28 flex-col items-start justify-between p-4 text-left transition-all',
+                'h-28 w-full flex-col items-start justify-between p-3 text-left transition-all sm:p-4',
                 !item.isAvailable && 'opacity-50 cursor-not-allowed',
                 item.isAvailable && 'hover:border-primary hover:bg-primary/5'
               )}

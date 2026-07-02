@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -51,7 +52,7 @@ export function CategoriesManager() {
   async function loadData() {
     try {
       setLoading(true)
-      const res = await fetch('/api/categories', { credentials: 'same-origin' })
+      const res = await apiFetch('/api/categories')
       if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`)
       const data = await res.json()
       setCategories(Array.isArray(data) ? data : [])
@@ -74,9 +75,8 @@ export function CategoriesManager() {
     try {
       if (editingId) {
         // Update
-        const res = await fetch(`/api/categories/${editingId}`, {
+        const res = await apiFetch(`/api/categories/${editingId}`, {
           method: 'PATCH',
-          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: formData.name,
@@ -99,9 +99,8 @@ export function CategoriesManager() {
         toast.success('Category updated')
       } else {
         // Create
-        const res = await fetch('/api/categories', {
+        const res = await apiFetch('/api/categories', {
           method: 'POST',
-          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: formData.name,
@@ -139,7 +138,7 @@ export function CategoriesManager() {
     if (!confirm('Delete this category?')) return
 
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE', credentials: 'same-origin' })
+      const res = await apiFetch(`/api/categories/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
       toast.success('Category deleted')
       await loadData()

@@ -2,15 +2,15 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { apiFetch } from '@/lib/api'
 
 // Fire-and-forget API sync – keeps optimistic UI fast
 async function dbSync(method: string, url: string, body?: unknown) {
   try {
-    await fetch(url, {
+    await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      credentials: 'same-origin',
     })
   } catch (e) {
     console.error('[db-sync error]', method, url, e)
@@ -19,6 +19,7 @@ async function dbSync(method: string, url: string, body?: unknown) {
 
 import type {
   User,
+  Customer,
   Category,
   MenuItem,
   Table,
@@ -30,10 +31,10 @@ import type {
   OrderStatus,
   TableStatus,
   StockAdjustment,
-  OrderSource,
 } from './types'
 import {
   mockUsers,
+  mockCustomers,
   mockCategories,
   mockMenuItems,
   mockTables,
@@ -80,10 +81,17 @@ interface POSStore {
   // Auth
   currentUser: User | null
   users: User[]
+  customers: Customer[]
+  selectedCustomer: Customer | null
   setCurrentUser: (user: User | null) => void
   addUser: (user: User) => void
   updateUser: (id: string, user: Partial<User>) => void
   deleteUser: (id: string) => void
+  addCustomer: (customer: Customer) => void
+  createCustomer: (customer: Pick<Customer, 'name' | 'phone' | 'email' | 'notes'>) => Promise<Customer | null>
+  updateCustomer: (id: string, customer: Partial<Customer>) => void
+  deleteCustomer: (id: string) => void
+  setSelectedCustomer: (customer: Customer | null) => void
   loginWithPin: (pin: string) => Promise<User | null>
   logout: () => Promise<void>
   refreshCurrentUser: () => Promise<User | null>
@@ -103,7 +111,6 @@ interface POSStore {
   cart: CartItem[]
   selectedTable: Table | null
   currentCustomerCount: number
-  currentOrderSource: OrderSource
   addToCart: (item: CartItem) => void
   removeFromCart: (itemId: string) => void
   updateCartItemQuantity: (itemId: string, quantity: number) => void
@@ -111,7 +118,6 @@ interface POSStore {
   clearCart: () => void
   setSelectedTable: (table: Table | null) => void
   setCurrentCustomerCount: (count: number) => void
-  setCurrentOrderSource: (source: OrderSource) => void
 
   // Orders
   orders: Order[]
@@ -161,6 +167,8 @@ export const usePOSStore = create<POSStore>()(
       // Auth
       currentUser: null,
       users: mockUsers,
+      customers: mockCustomers,
+      selectedCustomer: null,
       setCurrentUser: (user) => set({ currentUser: user }),
       addUser: (user) => {
         set((state) => ({ users: [...state.users, user] }))
@@ -174,13 +182,58 @@ export const usePOSStore = create<POSStore>()(
         set((state) => ({ users: state.users.filter((u) => u.id !== id) }))
         dbSync('DELETE', `/api/users/${id}`)
       },
-      loginWithPin: async (pin) => {
+      addCustomer: (customer) => {
+        set((state) => ({ customers: [...state.customers, customer] }))
+        dbSync('POST', '/api/customers', customer)
+      },
+      createCustomer: async (customerInput) => {
         try {
-          const response = await fetch('/api/auth/login', {
+          const response = await apiFetch('/api/customers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin }),
-            credentials: 'same-origin',
+            body: JSON.stringify(customerInput),
+          })
+
+          if (!response.ok) {
+            return null
+          }
+
+          const created = (await response.json()) as Customer
+          set((state) => ({
+            customers: [...state.customers.filter((customer) => customer.id !== created.id), created],
+          }))
+          return created
+        } catch (error) {
+          console.error('[createCustomer error]', error)
+          return null
+        }
+      },
+      updateCustomer: (id, customerData) => {
+        set((state) => ({
+          customers: state.customers.map((customer) =>
+            customer.id === id ? { ...customer, ...customerData } : customer
+          ),
+          selectedCustomer:
+            state.selectedCustomer?.id === id
+              ? { ...state.selectedCustomer, ...customerData }
+              : state.selectedCustomer,
+        }))
+        dbSync('PATCH', `/api/customers/${id}`, customerData)
+      },
+      deleteCustomer: (id) => {
+        set((state) => ({
+          customers: state.customers.filter((customer) => customer.id !== id),
+          selectedCustomer: state.selectedCustomer?.id === id ? null : state.selectedCustomer,
+        }))
+        dbSync('DELETE', `/api/customers/${id}`)
+      },
+      setSelectedCustomer: (customer) => set({ selectedCustomer: customer }),
+      loginWithPin: async (pin) => {
+        try {
+const response = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
           })
 
           if (!response.ok) {
@@ -202,9 +255,8 @@ export const usePOSStore = create<POSStore>()(
       },
       logout: async () => {
         try {
-          await fetch('/api/auth/logout', {
+          await apiFetch('/api/auth/logout', {
             method: 'POST',
-            credentials: 'same-origin',
           })
         } catch (error) {
           console.error('[logout error]', error)
@@ -214,10 +266,9 @@ export const usePOSStore = create<POSStore>()(
       },
       refreshCurrentUser: async () => {
         try {
-          const response = await fetch('/api/auth/me', {
-            method: 'GET',
-            cache: 'no-store',
-            credentials: 'same-origin',
+const response = await apiFetch('/api/auth/me', {
+        method: 'GET',
+        cache: 'no-store',
           })
 
           if (!response.ok) {
@@ -274,7 +325,6 @@ export const usePOSStore = create<POSStore>()(
       cart: [],
       selectedTable: null,
       currentCustomerCount: 1,
-      currentOrderSource: 'counter',
       addToCart: (item) =>
         set((state) => {
           const existingIndex = state.cart.findIndex(
@@ -308,10 +358,9 @@ export const usePOSStore = create<POSStore>()(
             i.id === itemId ? { ...i, notes } : i
           ),
         })),
-      clearCart: () => set({ cart: [], selectedTable: null, currentCustomerCount: 1, currentOrderSource: 'counter' }),
+      clearCart: () => set({ cart: [], selectedTable: null, selectedCustomer: null, currentCustomerCount: 1 }),
       setSelectedTable: (table) => set({ selectedTable: table }),
       setCurrentCustomerCount: (count) => set({ currentCustomerCount: Math.max(1, count) }),
-      setCurrentOrderSource: (source) => set({ currentOrderSource: source }),
 
       // Orders
       orders: mockOrders,
@@ -465,17 +514,18 @@ export const usePOSStore = create<POSStore>()(
       loadFromDB: async () => {
         try {
           await get().refreshCurrentUser()
-          const [users, categories, menuItems, tables, orders, inventory, suppliers, stockAdjustments, settings] =
+          const [users, customers, categories, menuItems, tables, orders, inventory, suppliers, stockAdjustments, settings] =
             await Promise.all([
-              fetch('/api/users', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/categories', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/menu-items', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/tables', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/orders', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/inventory', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/suppliers', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/stock-adjustments', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
-              fetch('/api/settings', { credentials: 'same-origin' }).then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/users').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/customers').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/categories').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/menu-items').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/tables').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/orders').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/inventory').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/suppliers').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/stock-adjustments').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
             ])
           const currentInventory = get().inventory
           const incomingInventory: InventoryItem[] = Array.isArray(inventory)
@@ -498,8 +548,16 @@ export const usePOSStore = create<POSStore>()(
             return Array.from(map.values()).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
           })()
 
+          const incomingCustomers: Customer[] = Array.isArray(customers) ? customers : get().customers
+          const currentSelectedCustomerId = get().selectedCustomer?.id
+          const syncedSelectedCustomer = currentSelectedCustomerId
+            ? incomingCustomers.find((customer) => customer.id === currentSelectedCustomerId) ?? null
+            : null
+
           set({
             users: Array.isArray(users) ? users : get().users,
+            customers: incomingCustomers,
+            selectedCustomer: syncedSelectedCustomer,
             categories: Array.isArray(categories) ? categories : get().categories,
             menuItems: Array.isArray(menuItems) ? menuItems : get().menuItems,
             tables: Array.isArray(tables) ? tables : get().tables,
@@ -544,6 +602,7 @@ export const usePOSStore = create<POSStore>()(
       name: 'pos-storage',
       partialize: (state) => ({
         users: state.users,
+        customers: state.customers,
         categories: state.categories,
         menuItems: state.menuItems,
         orders: state.orders,

@@ -41,6 +41,7 @@ export default function MenuManagementPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [showForm, setShowForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -115,13 +116,13 @@ export default function MenuManagementPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Menu Management</h1>
           <p className="text-muted-foreground">Manage your menu items and categories</p>
         </div>
-        <Button onClick={handleAdd} className="gap-2">
+        <Button onClick={handleAdd} className="w-full gap-2 sm:w-auto">
           <Plus className="h-4 w-4" />
           Add Item
         </Button>
@@ -139,7 +140,7 @@ export default function MenuManagementPage() {
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -153,55 +154,100 @@ export default function MenuManagementPage() {
         </Select>
       </div>
 
-      {/* Menu Items Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredItems.map((item) => (
-          <Card key={item.id} className={!item.isAvailable ? 'opacity-60' : ''}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="font-semibold text-foreground">{item.name}</h3>
-                  <p className="text-sm text-muted-foreground line-clamp-1">
-                    {item.description || 'No description'}
-                  </p>
-                </div>
-                <span className="text-lg font-bold text-primary">
-                  {settings.currencySymbol}{item.price.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">{getCategoryName(item.categoryId)}</Badge>
-                  {!item.isAvailable && (
-                    <Badge variant="secondary">Unavailable</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Switch
-                    checked={item.isAvailable}
-                    onCheckedChange={() => toggleItemAvailability(item.id)}
-                  />
-                  <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => handleDelete(item)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
+        <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>Table</Button>
       </div>
+
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredItems.map((item) => (
+            <Card key={item.id} className={!item.isAvailable ? 'opacity-60' : ''}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h3 className="font-semibold text-foreground">{item.name}</h3>
+                    <p className="text-sm text-muted-foreground line-clamp-1">
+                      {item.description || 'No description'}
+                    </p>
+                  </div>
+                  <span className="text-lg font-bold text-primary">
+                    {settings.currencySymbol}{item.price.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{getCategoryName(item.categoryId)}</Badge>
+                    {!item.isAvailable && (
+                      <Badge variant="secondary">Unavailable</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Switch
+                      checked={item.isAvailable}
+                      onCheckedChange={() => toggleItemAvailability(item.id)}
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 text-destructive"
+                      onClick={() => handleDelete(item)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="min-w-[720px] w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="p-3 text-left">Item</th>
+                <th className="p-3 text-left">Category</th>
+                <th className="p-3 text-left">Price</th>
+                <th className="p-3 text-left">Available</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.map((item) => (
+                <tr key={item.id} className="border-t">
+                  <td className="p-3">
+                    <div className="font-medium">{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.description || 'No description'}</div>
+                  </td>
+                  <td className="p-3"><Badge variant="outline">{getCategoryName(item.categoryId)}</Badge></td>
+                  <td className="p-3">{settings.currencySymbol}{item.price.toFixed(2)}</td>
+                  <td className="p-3">
+                    <Switch checked={item.isAvailable} onCheckedChange={() => toggleItemAvailability(item.id)} />
+                  </td>
+                  <td className="p-3">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => handleDelete(item)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader>
             <DialogTitle>{selectedItem ? 'Edit Menu Item' : 'Add Menu Item'}</DialogTitle>
           </DialogHeader>
@@ -223,7 +269,7 @@ export default function MenuManagementPage() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="price">Price</Label>
                 <Input
@@ -261,11 +307,11 @@ export default function MenuManagementPage() {
               />
               <Label>Available</Label>
             </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{selectedItem ? 'Update' : 'Add'}</Button>
+              <Button type="submit" className="w-full sm:w-auto">{selectedItem ? 'Update' : 'Add'}</Button>
             </div>
           </form>
         </DialogContent>
@@ -282,7 +328,7 @@ export default function MenuManagementPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={confirmDelete} className="h-10 bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

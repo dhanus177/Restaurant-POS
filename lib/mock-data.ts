@@ -1,11 +1,45 @@
-import type { User, Category, MenuItem, Table, InventoryItem, Order, Settings, Supplier } from './types'
+import type { User, Category, MenuItem, Table, InventoryItem, Order, Settings, Supplier, Customer } from './types'
 
 export const mockUsers: User[] = [
-  { id: '1', name: 'Admin User', pin: '1234', role: 'admin' },
+  { id: '1', name: 'Owner', pin: '2111', role: 'super-admin' },
   { id: '2', name: 'Sarah (Cashier)', pin: '2222', role: 'cashier' },
   { id: '3', name: 'Mike (Kitchen)', pin: '3333', role: 'kitchen' },
   { id: '4', name: 'Emma (Cashier)', pin: '4444', role: 'cashier' },
   { id: '5', name: 'Noah (Pay Counter)', pin: '5555', role: 'pay-counter' },
+  { id: '6', name: 'Liam (Takeaway)', pin: '6666', role: 'takeaway' },
+]
+
+export const mockCustomers: Customer[] = [
+  {
+    id: 'cust-1',
+    name: 'Walk-in VIP',
+    phone: '555-0101',
+    email: 'vip@example.com',
+    notes: 'Prefers window seating',
+    loyaltyPoints: 0,
+    lifetimeSpent: 0,
+    orderCount: 0,
+  },
+  {
+    id: 'cust-2',
+    name: 'Aarav Patel',
+    phone: '555-0102',
+    email: 'aarav@example.com',
+    notes: 'No onions on burgers',
+    loyaltyPoints: 0,
+    lifetimeSpent: 0,
+    orderCount: 0,
+  },
+  {
+    id: 'cust-3',
+    name: 'Emma Stone',
+    phone: '555-0103',
+    email: 'emma@example.com',
+    notes: 'Usually pays by card',
+    loyaltyPoints: 0,
+    lifetimeSpent: 0,
+    orderCount: 0,
+  },
 ]
 
 export const mockCategories: Category[] = [
@@ -377,7 +411,7 @@ export const mockOrders: Order[] = [
 ]
 
 export const mockSettings: Settings = {
-  restaurantName: 'The Good Fork',
+  restaurantName: 'restaurant-pos',
   address: '123 Main Street, Downtown',
   phone: '(555) 123-4567',
   taxRate: 10,

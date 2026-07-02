@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User, WalletCards } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User, WalletCards, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
@@ -21,10 +21,10 @@ interface HeaderProps {
 
 export function Header({ title }: HeaderProps) {
   const router = useRouter()
-  const { currentUser, settings, setCurrentUser } = usePOSStore()
+  const { currentUser, settings, logout } = usePOSStore()
 
-  const handleLogout = () => {
-    setCurrentUser(null)
+  const handleLogout = async () => {
+    await logout()
     router.push('/')
   }
 
@@ -39,6 +39,8 @@ export function Header({ title }: HeaderProps) {
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
+      case 'super-admin':
+        return 'bg-violet-600'
       case 'admin':
         return 'bg-primary'
       case 'cashier':
@@ -47,15 +49,17 @@ export function Header({ title }: HeaderProps) {
         return 'bg-warning'
       case 'pay-counter':
         return 'bg-emerald-600'
+      case 'takeaway':
+        return 'bg-orange-600'
       default:
         return 'bg-muted'
     }
   }
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4">
-      <div className="flex items-center gap-4">
-        <h1 className="text-xl font-bold text-foreground">{title}</h1>
+    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-3 sm:px-4">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        <h1 className="truncate text-base font-bold text-foreground sm:text-lg md:text-xl">{title}</h1>
         <span className="text-sm text-muted-foreground hidden md:block">
           {settings.restaurantName}
         </span>
@@ -63,7 +67,7 @@ export function Header({ title }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         {/* Quick Navigation for Admin */}
-        {currentUser?.role === 'admin' && (
+        {['admin', 'super-admin'].includes(currentUser?.role ?? '') && (
           <nav className="hidden md:flex items-center gap-1 mr-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/pos" className="gap-2">
@@ -87,6 +91,12 @@ export function Header({ title }: HeaderProps) {
               <Link href="/pay" className="gap-2">
                 <WalletCards className="h-4 w-4" />
                 Pay Counter
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/takeaway" className="gap-2">
+                <ShoppingBag className="h-4 w-4" />
+                Takeaway
               </Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
@@ -139,7 +149,7 @@ export function Header({ title }: HeaderProps) {
                   POS Terminal
                 </Link>
               </DropdownMenuItem>
-              {(currentUser?.role === 'admin' || currentUser?.role === 'kitchen') && (
+              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'kitchen') && (
                 <DropdownMenuItem asChild>
                   <Link href="/kitchen" className="gap-2">
                     <ChefHat className="h-4 w-4" />
@@ -147,7 +157,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {(currentUser?.role === 'admin' || currentUser?.role === 'pay-counter') && (
+              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter') && (
                 <DropdownMenuItem asChild>
                   <Link href="/pay" className="gap-2">
                     <WalletCards className="h-4 w-4" />
@@ -155,7 +165,15 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {currentUser?.role === 'admin' && (
+              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter' || currentUser?.role === 'cashier' || currentUser?.role === 'takeaway') && (
+                <DropdownMenuItem asChild>
+                  <Link href="/takeaway" className="gap-2">
+                    <ShoppingBag className="h-4 w-4" />
+                    Takeaway Counter
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {['admin', 'super-admin'].includes(currentUser?.role ?? '') && (
                 <>
                   <DropdownMenuItem asChild>
                     <Link href="/inventory" className="gap-2">

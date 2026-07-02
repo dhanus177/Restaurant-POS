@@ -20,9 +20,9 @@ export default function BillingPage() {
     currentUser,
     cart,
     selectedTable,
+    selectedCustomer,
     settings,
     currentCustomerCount,
-    currentOrderSource,
     getCartTotal,
     getNextOrderNumber,
     addOrder,
@@ -32,6 +32,8 @@ export default function BillingPage() {
 
   const [mounted, setMounted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount')
+  const [discountInput, setDiscountInput] = useState('0')
 
   useEffect(() => {
     setMounted(true)
@@ -45,7 +47,18 @@ export default function BillingPage() {
     if (mounted && cart.length === 0) router.push('/pos')
   }, [cart.length, mounted, router])
 
-  const { subtotal, tax, total } = getCartTotal()
+  const { subtotal } = getCartTotal()
+  const discountRaw = Number(discountInput) || 0
+  const discountAmount = useMemo(() => {
+    if (discountRaw <= 0) return 0
+    if (discountType === 'percent') {
+      return Math.min(subtotal, (subtotal * discountRaw) / 100)
+    }
+    return Math.min(subtotal, discountRaw)
+  }, [discountRaw, discountType, subtotal])
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount)
+  const tax = discountedSubtotal * (settings.taxRate / 100)
+  const total = discountedSubtotal + tax
   const perCustomer = useMemo(() => total / Math.max(currentCustomerCount, 1), [currentCustomerCount, total])
   const nextOrderNumber = getNextOrderNumber()
   const now = new Date().toISOString()
@@ -54,16 +67,19 @@ export default function BillingPage() {
 
   const buildPendingBill = (): Order => {
     const tableLabel = selectedTable
-      ? `${selectedTable.name} • ${currentCustomerCount} pax • ${currentOrderSource === 'diner-mobile' ? 'Diner Mobile' : 'Counter'}`
-      : `Takeaway • ${currentCustomerCount} pax • ${currentOrderSource === 'diner-mobile' ? 'Diner Mobile' : 'Counter'}`
+      ? `${selectedTable.name} • ${currentCustomerCount} pax • Counter`
+      : `Takeaway • ${currentCustomerCount} pax • Counter`
 
     return {
       id: `order-${Date.now()}`,
       orderNumber: nextOrderNumber,
       tableId: selectedTable?.id,
       tableName: tableLabel,
+      customerId: selectedCustomer?.id,
+      customerName: selectedCustomer?.name,
+      customerPhone: selectedCustomer?.phone,
       items: [...cart],
-      subtotal,
+      subtotal: discountedSubtotal,
       tax,
       total,
       status: 'pending',
@@ -115,17 +131,17 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
+    <div className="flex min-h-dvh flex-col bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
       <Header title="Billing Counter" />
 
-      <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm dark:border-amber-900/40 dark:bg-card/80">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">Bill counter</p>
-              <h1 className="text-2xl font-bold text-foreground">Create, barcode, and hand over the bill</h1>
+              <h1 className="text-xl font-bold text-foreground sm:text-2xl">Create, barcode, and hand over the bill</h1>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/20">Billing</Badge>
               <Badge variant="outline">{currentCustomerCount} pax</Badge>
             </div>
@@ -143,7 +159,7 @@ export default function BillingPage() {
             <CardContent className="space-y-4 p-6">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Order #{nextOrderNumber}</Badge>
-                <Badge variant="outline">{currentOrderSource === 'diner-mobile' ? 'Diner Mobile' : 'Counter'}</Badge>
+                <Badge variant="outline">Counter</Badge>
               </div>
 
               <div className="rounded-xl bg-amber-50 p-4 dark:bg-muted/30">
@@ -156,13 +172,23 @@ export default function BillingPage() {
                   <span>{currentCustomerCount} pax</span>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Customer</span>
+                  <span>{selectedCustomer?.name ?? 'Walk-in'}</span>
+                </div>
+                {selectedCustomer?.phone && (
+                  <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Phone</span>
+                    <span>{selectedCustomer.phone}</span>
+                  </div>
+                )}
+                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
                   <span>Order source</span>
-                  <span>{currentOrderSource === 'diner-mobile' ? 'Diner Mobile' : 'Counter'}</span>
+                  <span>Counter</span>
                 </div>
                 <Separator className="my-3" />
                 <div className="flex items-end justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Grand total</span>
-                  <span className="text-4xl font-black tracking-tight text-foreground">
+                  <span className="text-3xl font-black tracking-tight text-foreground sm:text-4xl">
                     {settings.currencySymbol}{total.toFixed(2)}
                   </span>
                 </div>
@@ -178,7 +204,39 @@ export default function BillingPage() {
               <Separator />
 
               <div className="space-y-3 text-sm">
+                <div className="rounded-lg border p-3 space-y-3">
+                  <div className="text-xs uppercase tracking-[0.15em] text-muted-foreground">Discount</div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={discountType === 'amount' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDiscountType('amount')}
+                    >
+                      Amount
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={discountType === 'percent' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setDiscountType('percent')}
+                    >
+                      %
+                    </Button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={discountInput}
+                    onChange={(e) => setDiscountInput(e.target.value)}
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    placeholder={discountType === 'percent' ? '0-100' : '0.00'}
+                  />
+                </div>
+
                 <div className="flex justify-between"><span>Subtotal</span><span>{settings.currencySymbol}{subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between text-emerald-600"><span>Discount</span><span>- {settings.currencySymbol}{discountAmount.toFixed(2)}</span></div>
                 <div className="flex justify-between"><span>Tax ({settings.taxRate}%)</span><span>{settings.currencySymbol}{tax.toFixed(2)}</span></div>
                 <div className="flex justify-between font-semibold text-foreground"><span>Final total</span><span>{settings.currencySymbol}{total.toFixed(2)}</span></div>
               </div>
@@ -206,13 +264,13 @@ export default function BillingPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
-          <Button variant="outline" size="lg" onClick={() => router.push('/pos')}>Back to POS</Button>
+          <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={() => router.push('/pos')}>Back to POS</Button>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="secondary" size="lg" className="gap-2" onClick={handlePrintBillingSlip} disabled={cart.length === 0 || isSubmitting}>
+            <Button variant="secondary" size="lg" className="w-full gap-2 sm:w-auto" onClick={handlePrintBillingSlip} disabled={cart.length === 0 || isSubmitting}>
               <Printer className="h-4 w-4" />
               Print Billing Slip
             </Button>
-            <Button size="lg" className="min-w-64" onClick={handleSendToPayCounter} disabled={isSubmitting || cart.length === 0}>
+            <Button size="lg" className="w-full sm:min-w-64" onClick={handleSendToPayCounter} disabled={isSubmitting || cart.length === 0}>
               {isSubmitting ? 'Sending...' : 'Send Bill to Pay Counter'}
             </Button>
           </div>

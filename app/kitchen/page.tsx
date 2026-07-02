@@ -65,12 +65,12 @@ export default function KitchenPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background" key={refreshKey}>
+    <div className="flex min-h-dvh flex-col bg-background" key={refreshKey}>
       <Header title="Kitchen Display" />
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 border-b border-border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <Badge variant={pendingCount > 0 ? 'default' : 'secondary'} className="text-sm px-3 py-1">
             {pendingCount} New Orders
           </Badge>
@@ -81,31 +81,31 @@ export default function KitchenPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={handleManualRefresh}
-            className="gap-2"
+            className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
           >
             <RefreshCw className="h-4 w-4" />
-            Refresh
+            <span className="sm:inline">Refresh</span>
           </Button>
           <Button
             variant={soundEnabled ? 'secondary' : 'outline'}
             size="sm"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="gap-2"
+            className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
           >
             {soundEnabled ? (
               <>
                 <Volume2 className="h-4 w-4" />
-                Sound On
+                <span>Sound On</span>
               </>
             ) : (
               <>
                 <VolumeX className="h-4 w-4" />
-                Sound Off
+                <span>Sound Off</span>
               </>
             )}
           </Button>

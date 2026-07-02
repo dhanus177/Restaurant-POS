@@ -1,11 +1,33 @@
 // User & Roles
-export type Role = 'admin' | 'cashier' | 'kitchen' | 'pay-counter'
+export type Role = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway'
 
 export interface User {
   id: string
   name: string
   pin: string
   role: Role
+}
+
+export interface Customer {
+  id: string
+  name: string
+  phone?: string
+  email?: string
+  notes?: string
+  loyaltyPoints?: number
+  lifetimeSpent?: number
+  orderCount?: number
+  lastOrderAt?: string
+  recentOrders?: Array<{
+    id: string
+    orderNumber: number
+    total: number
+    paymentStatus: PaymentStatus
+    status: OrderStatus
+    createdAt: string
+  }>
+  createdAt?: string
+  updatedAt?: string
 }
 
 // Menu
@@ -45,7 +67,6 @@ export interface MenuItem {
 export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
 export type PaymentMethod = 'cash' | 'card' | 'split'
 export type PaymentStatus = 'pending' | 'paid' | 'refunded'
-export type OrderSource = 'counter' | 'diner-mobile'
 
 export interface SelectedModifier {
   id: string
@@ -68,6 +89,9 @@ export interface Order {
   orderNumber: number
   tableId?: string
   tableName?: string
+  customerId?: string
+  customerName?: string
+  customerPhone?: string
   items: OrderItem[]
   subtotal: number
   tax: number

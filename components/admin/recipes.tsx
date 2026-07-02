@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -79,9 +80,9 @@ export function RecipesManager() {
     try {
       setLoading(true)
       const [recipesRes, menuRes, invRes] = await Promise.all([
-        fetch('/api/product-recipes', { credentials: 'same-origin' }),
-        fetch('/api/menu-items', { credentials: 'same-origin' }),
-        fetch('/api/inventory', { credentials: 'same-origin' }),
+        apiFetch('/api/product-recipes'),
+        apiFetch('/api/menu-items'),
+        apiFetch('/api/inventory'),
       ])
 
       if (!recipesRes.ok) throw new Error(`Failed to fetch recipes: ${recipesRes.status}`)
@@ -114,9 +115,8 @@ export function RecipesManager() {
         }
 
         // Update
-        const res = await fetch(`/api/product-recipes/${editingId}`, {
+        const res = await apiFetch(`/api/product-recipes/${editingId}`, {
           method: 'PATCH',
-          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity: parseFloat(formData.quantity) }),
         })
@@ -161,9 +161,8 @@ export function RecipesManager() {
 
         const creationResults = await Promise.all(
           validRows.map(async (row) => {
-            const res = await fetch('/api/product-recipes', {
+            const res = await apiFetch('/api/product-recipes', {
               method: 'POST',
-              credentials: 'same-origin',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 productId: formData.productId,
@@ -214,7 +213,7 @@ export function RecipesManager() {
     if (!confirm('Delete this recipe?')) return
 
     try {
-      const res = await fetch(`/api/product-recipes/${id}`, { method: 'DELETE', credentials: 'same-origin' })
+      const res = await apiFetch(`/api/product-recipes/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete')
       toast.success('Recipe deleted')
       await loadData()

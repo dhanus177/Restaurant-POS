@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { apiFetch } from '@/lib/api'
 import { usePOSStore } from '@/lib/store'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Store, Receipt, DollarSign, Save, Upload, X, Palette } from 'lucide-react'
+import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download } from 'lucide-react'
 import Image from 'next/image'
 import { useTheme } from 'next-themes'
 
@@ -29,18 +30,49 @@ const currencies = [
 ]
 
 export default function SettingsPage() {
-  const { settings, updateSettings } = usePOSStore()
+  const { currentUser, settings, updateSettings, loadFromDB } = usePOSStore()
   const [formData, setFormData] = useState(settings)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(false)
+  const canManageRestaurant = currentUser?.role === 'super-admin'
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    void loadFromDB()
+  }, [loadFromDB])
 
-  const handleSave = () => {
-    updateSettings(formData)
-    toast.success('Settings saved successfully')
+  useEffect(() => {
+    setFormData(settings)
+  }, [settings])
+
+  const handleSave = async () => {
+    if (!canManageRestaurant) {
+      toast.error('Only the super admin can change restaurant settings')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const res = await apiFetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      if (!res.ok) throw new Error('Failed to save settings')
+
+      const saved = await res.json()
+      updateSettings(saved)
+      toast.success('Settings saved successfully')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to save settings')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleCurrencyChange = (code: string) => {
@@ -54,12 +86,78 @@ export default function SettingsPage() {
     }
   }
 
+  const handleBackup = async () => {
+    if (!canManageRestaurant) {
+      toast.error('Only the super admin can create backups')
+      return
+    }
+
+    setIsBackingUp(true)
+    try {
+      const res = await apiFetch('/api/backup')
+      if (!res.ok) throw new Error('Backup failed')
+      const payload = await res.json()
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pos-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Database backup downloaded')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to create backup')
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const handleRestoreFile = async (file?: File | null) => {
+    if (!file) return
+    if (!canManageRestaurant) {
+      toast.error('Only the super admin can restore backups')
+      return
+    }
+    const confirmed = confirm('Restore will overwrite current data. Continue?')
+    if (!confirmed) return
+
+    setIsRestoring(true)
+    try {
+      const text = await file.text()
+      const payload = JSON.parse(text)
+      const res = await apiFetch('/api/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Restore failed')
+      await loadFromDB()
+      toast.success('Database restored successfully')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to restore backup')
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-3xl">
+    <div className="mx-auto max-w-3xl space-y-6 p-3 sm:p-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Configure your restaurant POS system</p>
       </div>
+
+      {!canManageRestaurant && (
+        <Card className="border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-500/10">
+          <CardContent className="p-4 text-sm text-amber-900 dark:text-amber-100">
+            You can view settings, but only the <span className="font-semibold">super admin</span> can change restaurant information, financial settings, and backup/restore data.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Restaurant Info */}
       <Card>
@@ -73,10 +171,11 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <fieldset disabled={!canManageRestaurant} className="space-y-4 disabled:pointer-events-none disabled:opacity-70">
           {/* Logo Upload */}
           <div className="grid gap-2">
             <Label>Company Logo</Label>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               {formData.logo ? (
                 <div className="relative h-20 w-20 rounded-lg border overflow-hidden bg-muted flex items-center justify-center">
                   <Image
@@ -152,6 +251,7 @@ export default function SettingsPage() {
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             />
           </div>
+          </fieldset>
         </CardContent>
       </Card>
 
@@ -167,7 +267,8 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <fieldset disabled={!canManageRestaurant} className="space-y-4 disabled:pointer-events-none disabled:opacity-70">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="taxRate">Tax Rate (%)</Label>
               <Input
@@ -196,6 +297,7 @@ export default function SettingsPage() {
               </Select>
             </div>
           </div>
+          </fieldset>
         </CardContent>
       </Card>
 
@@ -241,6 +343,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <fieldset disabled={!canManageRestaurant} className="space-y-4 disabled:pointer-events-none disabled:opacity-70">
           <div className="grid gap-2">
             <Label htmlFor="footer">Receipt Footer Message</Label>
             <Textarea
@@ -251,15 +354,50 @@ export default function SettingsPage() {
               rows={2}
             />
           </div>
+          </fieldset>
+        </CardContent>
+      </Card>
+
+      {/* Backup & Restore */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Database Backup & Restore
+          </CardTitle>
+          <CardDescription>
+            Download a full JSON backup, or restore from a previously exported backup file.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Button onClick={() => void handleBackup()} variant="outline" className="w-full sm:w-auto" disabled={!canManageRestaurant || isBackingUp || isRestoring}>
+            {isBackingUp ? 'Creating backup...' : 'Download Backup'}
+          </Button>
+
+          <div>
+            <Label htmlFor="restore-backup" className="mb-2 block">Restore from backup (.json)</Label>
+            <Input
+              id="restore-backup"
+              type="file"
+              accept="application/json,.json"
+              disabled={!canManageRestaurant || isBackingUp || isRestoring}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                void handleRestoreFile(file)
+                e.currentTarget.value = ''
+              }}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">Warning: restore replaces current operational data.</p>
+          </div>
         </CardContent>
       </Card>
 
       <Separator />
 
       <div className="flex justify-end">
-        <Button onClick={handleSave} size="lg" className="gap-2">
+        <Button onClick={() => void handleSave()} size="lg" className="w-full gap-2 sm:w-auto" disabled={!canManageRestaurant || isSaving || isBackingUp || isRestoring}>
           <Save className="h-4 w-4" />
-          Save Settings
+          {isSaving ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
     </div>

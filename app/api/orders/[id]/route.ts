@@ -61,6 +61,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const nextStatus = normalize((body as Record<string, unknown>).status)
     const shouldDeductIngredients = nextStatus === 'completed' && normalize(currentOrder.status) !== 'completed'
+    const nextPaymentStatus = normalize((body as Record<string, unknown>).paymentStatus)
+    const shouldAwardLoyalty =
+      Boolean(currentOrder.customerId) &&
+      nextPaymentStatus === 'paid' &&
+      normalize(currentOrder.paymentStatus) !== 'paid'
 
     if (shouldDeductIngredients && hasProductRecipesTable) {
       const rawRecipes = await tx.$queryRaw<Array<{ row: JsonRow }>>`
@@ -162,6 +167,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           })
         }
       }
+    }
+
+    if (shouldAwardLoyalty && currentOrder.customerId) {
+      const loyaltyEarned = Math.max(1, Math.floor(currentOrder.total / 10))
+      await tx.customer.update({
+        where: { id: currentOrder.customerId },
+        data: {
+          orderCount: { increment: 1 },
+          lifetimeSpent: { increment: currentOrder.total },
+          loyaltyPoints: { increment: loyaltyEarned },
+          lastOrderAt: new Date(),
+        },
+      })
     }
 
     return tx.order.update({

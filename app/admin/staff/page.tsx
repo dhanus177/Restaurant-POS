@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePOSStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -35,17 +35,54 @@ import { toast } from 'sonner'
 import type { User as UserType, Role } from '@/lib/types'
 
 export default function StaffManagementPage() {
-  const { users, currentUser, addUser, updateUser, deleteUser } = usePOSStore()
+  const { users, currentUser, addUser, updateUser, deleteUser, loadFromDB } = usePOSStore()
   const [showForm, setShowForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     pin: '',
     role: 'cashier' as Role,
   })
+  const canManageSuperAdmins = currentUser?.role === 'super-admin'
+
+  useEffect(() => {
+    void loadFromDB()
+  }, [loadFromDB])
+
+  const assignableRoles = useMemo(
+    () => (canManageSuperAdmins
+      ? [
+          { value: 'super-admin', label: 'Super Admin' },
+          { value: 'admin', label: 'Admin' },
+          { value: 'cashier', label: 'Cashier' },
+          { value: 'kitchen', label: 'Kitchen' },
+          { value: 'pay-counter', label: 'Pay Counter' },
+          { value: 'takeaway', label: 'Takeaway' },
+        ]
+      : [
+          { value: 'admin', label: 'Admin' },
+          { value: 'cashier', label: 'Cashier' },
+          { value: 'kitchen', label: 'Kitchen' },
+          { value: 'pay-counter', label: 'Pay Counter' },
+          { value: 'takeaway', label: 'Takeaway' },
+        ]),
+    [canManageSuperAdmins]
+  )
+
+  useEffect(() => {
+    const isCurrentRoleAssignable = assignableRoles.some((r) => r.value === formData.role)
+    if (!isCurrentRoleAssignable && assignableRoles.length > 0) {
+      setFormData((prev) => ({ ...prev, role: assignableRoles[0].value as Role }))
+    }
+  }, [assignableRoles, formData.role])
 
   const handleEdit = (user: UserType) => {
+    if (user.role === 'super-admin' && !canManageSuperAdmins) {
+      toast.error('Only the super admin can edit the owner account')
+      return
+    }
     setSelectedUser(user)
     setFormData({
       name: user.name,
@@ -68,12 +105,17 @@ export default function StaffManagementPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (formData.role === 'super-admin' && !canManageSuperAdmins) {
+      toast.error('Only the super admin can assign the super-admin role')
+      return
+    }
+
     // Check for duplicate PIN
     const existingUser = users.find(
       (u) => u.pin === formData.pin && u.id !== selectedUser?.id
     )
     if (existingUser) {
-      toast.error('This PIN is already in use')
+      toast.error(`PIN already used by ${existingUser.name}`)
       return
     }
 
@@ -96,6 +138,10 @@ export default function StaffManagementPage() {
   }
 
   const handleDelete = (user: UserType) => {
+    if (user.role === 'super-admin' && !canManageSuperAdmins) {
+      toast.error('Only the super admin can delete the owner account')
+      return
+    }
     setSelectedUser(user)
     setShowDeleteConfirm(true)
   }
@@ -111,6 +157,8 @@ export default function StaffManagementPage() {
 
   const getRoleBadgeColor = (role: Role) => {
     switch (role) {
+      case 'super-admin':
+        return 'bg-violet-600 text-white'
       case 'admin':
         return 'bg-primary text-primary-foreground'
       case 'cashier':
@@ -119,65 +167,101 @@ export default function StaffManagementPage() {
         return 'bg-warning text-warning-foreground'
       case 'pay-counter':
         return 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
+      case 'takeaway':
+        return 'bg-orange-600 text-white dark:bg-orange-500 dark:text-slate-950'
       default:
         return ''
     }
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Staff Management</h1>
           <p className="text-muted-foreground">Manage staff members and their roles</p>
         </div>
-        <Button onClick={handleAdd} className="gap-2">
+        <Button onClick={handleAdd} className="w-full gap-2 sm:w-auto">
           <Plus className="h-4 w-4" />
           Add Staff
         </Button>
       </div>
 
-      {/* Staff Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {users.map((user) => (
-          <Card key={user.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${getRoleBadgeColor(user.role)}`}>
-                    <User className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground">{user.name}</h3>
-                    <p className="text-sm text-muted-foreground">PIN: {user.pin}</p>
-                  </div>
-                </div>
-                <Badge className={getRoleBadgeColor(user.role)}>
-                  {user.role}
-                </Badge>
-              </div>
-              <div className="flex justify-end gap-1 mt-4">
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => handleDelete(user)}
-                  disabled={user.id === currentUser?.id}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
+        <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>Table</Button>
       </div>
+
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {users.map((user) => (
+            <Card key={user.id}>
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${getRoleBadgeColor(user.role)}`}>
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">{user.name}</h3>
+                      <p className="text-sm text-muted-foreground">PIN: {user.pin}</p>
+                    </div>
+                  </div>
+                  <Badge className={`w-fit ${getRoleBadgeColor(user.role)}`}>
+                    {user.role}
+                  </Badge>
+                </div>
+                <div className="flex justify-end gap-1 mt-4">
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-destructive"
+                    onClick={() => handleDelete(user)}
+                    disabled={user.id === currentUser?.id || (user.role === 'super-admin' && !canManageSuperAdmins)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="min-w-[680px] w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="p-3 text-left">Name</th>
+                <th className="p-3 text-left">PIN</th>
+                <th className="p-3 text-left">Role</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className="border-t">
+                  <td className="p-3 font-medium">{user.name}</td>
+                  <td className="p-3">{user.pin}</td>
+                  <td className="p-3"><Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge></td>
+                  <td className="p-3">
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => handleDelete(user)} disabled={user.id === currentUser?.id || (user.role === 'super-admin' && !canManageSuperAdmins)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader>
             <DialogTitle>{selectedUser ? 'Edit Staff' : 'Add Staff'}</DialogTitle>
           </DialogHeader>
@@ -211,22 +295,26 @@ export default function StaffManagementPage() {
                 value={formData.role}
                 onValueChange={(value) => setFormData({ ...formData, role: value as Role })}
               >
-                <SelectTrigger>
-                  <SelectValue />
+                <SelectTrigger className="w-full" id="role">
+                  <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="cashier">Cashier</SelectItem>
-                  <SelectItem value="kitchen">Kitchen</SelectItem>
-                  <SelectItem value="pay-counter">Pay Counter</SelectItem>
+                  {assignableRoles.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {!canManageSuperAdmins && (
+                <p className="text-xs text-muted-foreground">Only super admin can assign the super-admin role.</p>
+              )}
             </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{selectedUser ? 'Update' : 'Add'}</Button>
+              <Button type="submit" className="w-full sm:w-auto">{selectedUser ? 'Update' : 'Add'}</Button>
             </div>
           </form>
         </DialogContent>
@@ -243,7 +331,7 @@ export default function StaffManagementPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={confirmDelete} className="h-10 bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

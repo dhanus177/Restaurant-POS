@@ -56,8 +56,8 @@ export function OrderQueue() {
   return (
     <div className="h-full flex flex-col">
       <Tabs defaultValue="all" className="flex-1 flex flex-col">
-        <div className="border-b border-border px-4 py-2">
-          <TabsList>
+        <div className="border-b border-border px-3 py-2 sm:px-4">
+          <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap">
             <TabsTrigger value="all" className="gap-2">
               All
               <Badge variant="secondary" className="ml-1">

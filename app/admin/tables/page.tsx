@@ -31,6 +31,7 @@ export default function TablesManagementPage() {
   const { tables, addTable, updateTable, deleteTable, updateTableStatus } = usePOSStore()
   const [showForm, setShowForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [selectedTable, setSelectedTable] = useState<Table | null>(null)
   const [formData, setFormData] = useState({
     number: 1,
@@ -108,70 +109,105 @@ export default function TablesManagementPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 p-3 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Table Management</h1>
           <p className="text-muted-foreground">Manage your restaurant tables</p>
         </div>
-        <Button onClick={handleAdd} className="gap-2">
+        <Button onClick={handleAdd} className="w-full gap-2 sm:w-auto">
           <Plus className="h-4 w-4" />
           Add Table
         </Button>
       </div>
 
-      {/* Tables Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {tables.map((table) => (
-          <Card key={table.id} className={`${getStatusColor(table.status)} transition-colors`}>
-            <CardContent className="p-4 text-center">
-              <h3 className="text-lg font-bold text-foreground">{table.name}</h3>
-              <div className="flex items-center justify-center gap-1 text-muted-foreground my-2">
-                <Users className="h-4 w-4" />
-                <span>{table.seats} seats</span>
-              </div>
-              <Badge
-                variant={table.status === 'available' ? 'default' : 'secondary'}
-                className="mb-3"
-              >
-                {table.status}
-              </Badge>
-              <div className="flex justify-center gap-1">
-                {table.status === 'occupied' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleClearTable(table)}
-                  >
-                    Clear
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" onClick={() => handleEdit(table)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => handleDelete(table)}
-                  disabled={table.status === 'occupied'}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
+        <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>Table</Button>
       </div>
+
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {tables.map((table) => (
+            <Card key={table.id} className={`${getStatusColor(table.status)} transition-colors`}>
+              <CardContent className="p-4 text-center">
+                <h3 className="text-lg font-bold text-foreground">{table.name}</h3>
+                <div className="flex items-center justify-center gap-1 text-muted-foreground my-2">
+                  <Users className="h-4 w-4" />
+                  <span>{table.seats} seats</span>
+                </div>
+                <Badge
+                  variant={table.status === 'available' ? 'default' : 'secondary'}
+                  className="mb-3"
+                >
+                  {table.status}
+                </Badge>
+                <div className="flex justify-center gap-1">
+                  {table.status === 'occupied' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleClearTable(table)}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" onClick={() => handleEdit(table)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 text-destructive"
+                    onClick={() => handleDelete(table)}
+                    disabled={table.status === 'occupied'}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="min-w-[680px] w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="p-3 text-left">Table</th>
+                <th className="p-3 text-left">Seats</th>
+                <th className="p-3 text-left">Status</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tables.map((table) => (
+                <tr key={table.id} className="border-t">
+                  <td className="p-3 font-medium">{table.name}</td>
+                  <td className="p-3">{table.seats}</td>
+                  <td className="p-3"><Badge variant={table.status === 'available' ? 'default' : 'secondary'}>{table.status}</Badge></td>
+                  <td className="p-3">
+                    <div className="flex justify-end gap-1">
+                      {table.status === 'occupied' && <Button variant="outline" size="sm" onClick={() => handleClearTable(table)}>Clear</Button>}
+                      <Button variant="ghost" size="icon" onClick={() => handleEdit(table)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => handleDelete(table)} disabled={table.status === 'occupied'}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="w-[95vw] max-w-lg">
           <DialogHeader>
             <DialogTitle>{selectedTable ? 'Edit Table' : 'Add Table'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="number">Table Number</Label>
                 <Input
@@ -205,11 +241,11 @@ export default function TablesManagementPage() {
                 required
               />
             </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit">{selectedTable ? 'Update' : 'Add'}</Button>
+              <Button type="submit" className="w-full sm:w-auto">{selectedTable ? 'Update' : 'Add'}</Button>
             </div>
           </form>
         </DialogContent>
@@ -226,7 +262,7 @@ export default function TablesManagementPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction onClick={confirmDelete} className="h-10 bg-destructive text-destructive-foreground">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

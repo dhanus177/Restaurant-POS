@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,11 +15,12 @@ import type { InventoryItem, StockAdjustment } from '@/lib/types'
 
 interface StockAdjustmentDialogProps {
   item: InventoryItem | null
+  initialType?: 'add' | 'remove' | 'waste' | 'transfer'
   open: boolean
   onClose: () => void
 }
 
-export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDialogProps) {
+export function StockAdjustmentDialog({ item, initialType = 'add', open, onClose }: StockAdjustmentDialogProps) {
   const { currentUser, adjustStock } = usePOSStore()
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove' | 'waste' | 'transfer'>('add')
   const [location, setLocation] = useState<'inventory' | 'storage'>('inventory')
@@ -27,14 +28,33 @@ export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDi
   const [quantity, setQuantity] = useState('')
   const [reason, setReason] = useState('')
 
+  useEffect(() => {
+    if (!open) return
+
+    setAdjustmentType(initialType)
+    setLocation('inventory')
+    setTransferDirection('storage-to-inventory')
+    setQuantity('')
+    setReason('')
+  }, [initialType, open, item?.id])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!item || !quantity) return
 
     const parsedQty = parseFloat(quantity)
+    if (!Number.isFinite(parsedQty) || parsedQty <= 0) return
     const fromLocation = transferDirection === 'inventory-to-storage' ? 'inventory' : 'storage'
     const toLocation = transferDirection === 'inventory-to-storage' ? 'storage' : 'inventory'
+
+    const availableAtLocation = location === 'inventory' ? item.quantity : item.storageQuantity ?? 0
+    const isSubtractiveAdjustment = adjustmentType === 'remove' || adjustmentType === 'waste'
+
+    if (isSubtractiveAdjustment && parsedQty > availableAtLocation) {
+      toast.error(`Only ${availableAtLocation} ${item.unit} available in ${location}`)
+      return
+    }
 
     const adjustment: StockAdjustment = {
       id: `adj-${Date.now()}`,
@@ -54,9 +74,15 @@ export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDi
     }
 
     adjustStock(adjustment)
-    toast.success(adjustmentType === 'transfer'
-      ? `Transferred ${quantity} ${item.unit} (${fromLocation} → ${toLocation})`
-      : `${adjustmentType === 'add' ? 'Added' : 'Removed'} ${quantity} ${item.unit} in ${location}`)
+    toast.success(
+      adjustmentType === 'transfer'
+        ? `Transferred ${quantity} ${item.unit} (${fromLocation} → ${toLocation})`
+        : adjustmentType === 'add'
+          ? `Added ${quantity} ${item.unit} to ${location}`
+          : adjustmentType === 'waste'
+            ? `Recorded ${quantity} ${item.unit} as waste from ${location}`
+            : `Removed ${quantity} ${item.unit} from ${location}`
+    )
 
     setQuantity('')
     setReason('')
@@ -68,12 +94,15 @@ export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDi
   const storageQty = item.storageQuantity ?? 0
   const parsedQty = parseFloat(quantity || '0')
   const isTransfer = adjustmentType === 'transfer'
+  const isSubtractiveAdjustment = adjustmentType === 'remove' || adjustmentType === 'waste'
   const fromLocation = transferDirection === 'inventory-to-storage' ? 'inventory' : 'storage'
   const canTransfer = isTransfer
     ? fromLocation === 'inventory'
       ? parsedQty <= item.quantity
       : parsedQty <= storageQty
     : true
+  const availableAtLocation = location === 'inventory' ? item.quantity : storageQty
+  const canRemove = isSubtractiveAdjustment ? parsedQty <= availableAtLocation : true
 
   const nextInventory = (() => {
     if (!quantity) return item.quantity
@@ -102,6 +131,9 @@ export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDi
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Adjust Stock: {item.name}</DialogTitle>
+          <DialogDescription>
+            Add, remove, waste, or transfer stock for this inventory item while previewing the resulting quantities.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="py-2">
@@ -229,16 +261,24 @@ export function StockAdjustmentDialog({ item, open, onClose }: StockAdjustmentDi
                 </p>
               )}
 
+              {!isTransfer && isSubtractiveAdjustment && quantity && !canRemove && (
+                <p className="text-sm text-destructive">
+                  Not enough stock in {location}. Available: {availableAtLocation} {item.unit}.
+                </p>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={!quantity || parseFloat(quantity) <= 0 || (isTransfer && !canTransfer)}>
+                <Button type="submit" disabled={!quantity || parseFloat(quantity) <= 0 || (isTransfer && !canTransfer) || (!isTransfer && !canRemove)}>
                   {adjustmentType === 'add'
                     ? `Add to ${location}`
                     : adjustmentType === 'transfer'
                     ? 'Transfer Stock'
-                    : `Remove from ${location}`}
+                    : adjustmentType === 'waste'
+                      ? `Record waste from ${location}`
+                      : `Remove from ${location}`}
                 </Button>
               </div>
             </form>

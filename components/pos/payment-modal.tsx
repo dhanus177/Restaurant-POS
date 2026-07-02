@@ -70,7 +70,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
     }
 
     const orderNumber = getNextOrderNumber()
-    const order: Order = {
+    const newOrder: Order = {
       id: `order-${Date.now()}`,
       orderNumber,
       tableId: selectedTable?.id,
@@ -87,18 +87,18 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
       createdBy: currentUser?.id || 'unknown',
     }
 
-    addOrder(order)
+    addOrder(newOrder)
 
     if (selectedTable) {
-      updateTableStatus(selectedTable.id, 'occupied', order.id)
+      updateTableStatus(selectedTable.id, 'occupied', newOrder.id)
     }
 
-    setCompletedOrder(order)
+    setCompletedOrder(newOrder)
     setIsComplete(true)
     setIsProcessing(false)
 
     // Auto-print final bill receipt only
-    printReceipt(order, settings)
+    printReceipt(newOrder, settings)
 
     toast.success(`Order #${orderNumber} placed successfully!`)
   }

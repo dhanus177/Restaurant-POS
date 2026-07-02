@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { apiFetch } from '@/lib/api'
 import { Store, Save, Upload, X, ArrowLeft, UserCog } from 'lucide-react'
 import { usePOSStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -63,7 +64,7 @@ export default function CreateRestaurantPage() {
 
     const loadExistingAdmin = async () => {
       try {
-        const res = await fetch('/api/users', { credentials: 'same-origin' })
+        const res = await apiFetch('/api/users')
         if (!res.ok) return
         const users: Array<{ id: string; name: string; pin: string; role: string }> = await res.json()
         const admin = users.find((u) => u.role === 'super-admin') ?? users.find((u) => u.role === 'admin')
@@ -117,9 +118,8 @@ export default function CreateRestaurantPage() {
 
     setIsSaving(true)
     try {
-      const settingsRes = await fetch('/api/settings', {
+      const settingsRes = await apiFetch('/api/settings', {
         method: 'PATCH',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
@@ -135,9 +135,8 @@ export default function CreateRestaurantPage() {
         role: 'super-admin',
       }
 
-      const adminRes = await fetch(existingAdminId ? `/api/users/${existingAdminId}` : '/api/users', {
+      const adminRes = await apiFetch(existingAdminId ? `/api/users/${existingAdminId}` : '/api/users', {
         method: existingAdminId ? 'PATCH' : 'POST',
-        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminPayload),
       })
@@ -149,9 +148,8 @@ export default function CreateRestaurantPage() {
       const savedAdmin = await adminRes.json()
 
       if (!existingAdminId) {
-        const loginRes = await fetch('/api/auth/login', {
+        const loginRes = await apiFetch('/api/auth/login', {
           method: 'POST',
-          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin: adminPin }),
         })

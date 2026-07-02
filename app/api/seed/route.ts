@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import {
   mockUsers,
+  mockCustomers,
   mockCategories,
   mockMenuItems,
   mockTables,
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
         prisma.supplier.deleteMany(),
         prisma.category.deleteMany(),
         prisma.user.deleteMany(),
+        prisma.customer.deleteMany(),
         prisma.settings.deleteMany(),
       ])
     }
@@ -54,6 +56,9 @@ export async function POST(req: Request) {
 
     // Users
     await prisma.user.createMany({ data: mockUsers })
+
+    // Customers
+    await prisma.customer.createMany({ data: mockCustomers })
 
     // Categories
     await prisma.category.createMany({ data: mockCategories })
