@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge'
 import { PaymentModal } from '@/components/pos/payment-modal'
 import { generateBillCode } from '@/lib/print'
 import type { Order } from '@/lib/types'
-import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag } from 'lucide-react'
+import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function PayPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function PayPage() {
   const [query, setQuery] = useState('')
   const [scanCode, setScanCode] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const canReverseBills = currentUser?.role === 'admin' || currentUser?.role === 'super-admin'
 
   useEffect(() => {
     setMounted(true)
@@ -70,6 +72,10 @@ export default function PayPage() {
   }
 
   const handleVoid = (order: Order) => {
+    if (!canReverseBills) {
+      toast.error('Only admin and super-admin can void bills')
+      return
+    }
     if (!confirm(`Void order #${order.orderNumber}?`)) return
     updateOrderStatus(order.id, 'cancelled')
     if (order.tableId) {
@@ -78,12 +84,21 @@ export default function PayPage() {
   }
 
   const handleRefund = (order: Order) => {
+    if (!canReverseBills) {
+      toast.error('Only admin and super-admin can refund bills')
+      return
+    }
     if (!confirm(`Refund order #${order.orderNumber}?`)) return
     updateOrderPayment(order.id, order.paymentMethod ?? 'cash', 'refunded')
     updateOrderStatus(order.id, 'cancelled')
     if (order.tableId) {
       updateTableStatus(order.tableId, 'available', undefined)
     }
+  }
+
+  const handleCompleteTakeawayOrder = (order: Order) => {
+    if (!confirm(`Mark takeaway order #${order.orderNumber} as completed?`)) return
+    updateOrderStatus(order.id, 'completed')
   }
 
   if (!mounted || !currentUser || !['admin', 'super-admin', 'pay-counter'].includes(currentUser.role)) {
@@ -214,9 +229,15 @@ export default function PayPage() {
                       <Button className="h-12 w-full" size="lg" onClick={() => setSelectedOrder(order)}>
                         Collect
                       </Button>
-                      <Button className="h-12 w-full" variant="destructive" size="lg" onClick={() => handleVoid(order)}>
-                        Void
-                      </Button>
+                      {canReverseBills ? (
+                        <Button className="h-12 w-full" variant="destructive" size="lg" onClick={() => handleVoid(order)}>
+                          Void
+                        </Button>
+                      ) : (
+                        <Button className="h-12 w-full" variant="destructive" size="lg" disabled title="Only admin and super-admin can void bills">
+                          Void
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -243,7 +264,23 @@ export default function PayPage() {
                         <div className="text-xs text-muted-foreground">Customer: {order.customerName}</div>
                       )}
                     </div>
-                    <Button variant="destructive" onClick={() => handleRefund(order)}>Refund</Button>
+                    <div className="flex gap-2">
+                      {!order.tableId && order.status !== 'completed' && order.status !== 'cancelled' && (
+                        <Button
+                          variant="secondary"
+                          className="gap-2"
+                          onClick={() => handleCompleteTakeawayOrder(order)}
+                        >
+                          <Check className="h-4 w-4" />
+                          Complete Order
+                        </Button>
+                      )}
+                      {canReverseBills ? (
+                        <Button variant="destructive" onClick={() => handleRefund(order)}>Refund</Button>
+                      ) : (
+                        <Button variant="destructive" disabled title="Only admin and super-admin can refund bills">Refund</Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}

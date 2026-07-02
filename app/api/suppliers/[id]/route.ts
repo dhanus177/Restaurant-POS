@@ -10,6 +10,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const linkedInventoryCount = await prisma.inventoryItem.count({ where: { supplierId: id } })
+
+  if (linkedInventoryCount > 0) {
+    return NextResponse.json(
+      {
+        error: `Cannot delete supplier. It is linked to ${linkedInventoryCount} inventory item${linkedInventoryCount === 1 ? '' : 's'}.`,
+      },
+      { status: 409 }
+    )
+  }
+
   await prisma.supplier.delete({ where: { id } })
   return new NextResponse(null, { status: 204 })
 }

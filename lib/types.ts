@@ -124,6 +124,7 @@ export interface Supplier {
   contact: string
   email: string
   phone: string
+  inventoryItemCount?: number
 }
 
 export interface InventoryItem {

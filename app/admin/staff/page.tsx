@@ -106,7 +106,7 @@ export default function StaffManagementPage() {
     e.preventDefault()
 
     if (formData.role === 'super-admin' && !canManageSuperAdmins) {
-      toast.error('Only the super admin can assign the super-admin role')
+      toast.error('Only super admin can create a super-admin account')
       return
     }
 
