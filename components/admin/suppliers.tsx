@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,25 @@ import {
 } from '@/components/ui/table'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Edit2, List, Mail, Phone, Plus, Trash2, UserRound } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  Building2,
+  Edit2,
+  List,
+  Mail,
+  PackagePlus,
+  Phone,
+  Plus,
+  Printer,
+  Receipt,
+  Trash2,
+  UserRound,
+  Wallet,
+} from 'lucide-react'
 import { toast } from 'sonner'
-import type { InventoryItem, Supplier } from '@/lib/types'
+import { printSupplierStatement } from '@/lib/print'
+import { usePOSStore } from '@/lib/store'
+import type { InventoryItem, Supplier, SupplierLedgerEntry, SupplierLedgerEntryType } from '@/lib/types'
 
 const emptyForm = {
   name: '',
@@ -34,7 +51,35 @@ const emptyForm = {
   phone: '',
 }
 
+const emptyLedgerForm = {
+  type: 'purchase' as SupplierLedgerEntryType,
+  reference: '',
+  inventoryItemId: '',
+  quantity: '',
+  amount: '',
+  notes: '',
+}
+
+type LedgerDateRange = 'all' | '7days' | '30days' | '90days'
+
+function getAutoReference(type: SupplierLedgerEntryType, existingEntries: SupplierLedgerEntry[]) {
+  const prefixMap: Record<SupplierLedgerEntryType, string> = {
+    purchase: 'PUR',
+    grn: 'GRN',
+    payment: 'PAY',
+    return: 'RET',
+  }
+
+  const now = new Date()
+  const y = now.getFullYear().toString().slice(-2)
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  const sequence = existingEntries.filter((entry) => entry.type === type).length + 1
+  return `${prefixMap[type]}-${y}${m}${d}-${String(sequence).padStart(3, '0')}`
+}
+
 export function SuppliersManager() {
+  const { settings } = usePOSStore()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -42,6 +87,13 @@ export function SuppliersManager() {
   const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null)
   const [linkedItems, setLinkedItems] = useState<InventoryItem[]>([])
   const [linkedItemsLoading, setLinkedItemsLoading] = useState(false)
+  const [ledgerSupplier, setLedgerSupplier] = useState<Supplier | null>(null)
+  const [ledgerEntries, setLedgerEntries] = useState<SupplierLedgerEntry[]>([])
+  const [ledgerLoading, setLedgerLoading] = useState(false)
+  const [ledgerFilter, setLedgerFilter] = useState<'all' | SupplierLedgerEntryType>('all')
+  const [ledgerDateRange, setLedgerDateRange] = useState<LedgerDateRange>('all')
+  const [ledgerForm, setLedgerForm] = useState(emptyLedgerForm)
+  const [ledgerSaving, setLedgerSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [formData, setFormData] = useState(emptyForm)
 
@@ -185,6 +237,177 @@ export function SuppliersManager() {
     }
   }
 
+  async function openLedger(supplier: Supplier) {
+    try {
+      setLedgerSupplier(supplier)
+      setLedgerEntries([])
+      setLedgerLoading(true)
+      setLedgerFilter('all')
+      setLedgerDateRange('all')
+
+      const [ledgerRes, inventoryRes] = await Promise.all([
+        apiFetch(`/api/suppliers/${supplier.id}/ledger`),
+        apiFetch('/api/inventory'),
+      ])
+
+      if (!ledgerRes.ok) throw new Error('Failed to load supplier ledger')
+      if (!inventoryRes.ok) throw new Error('Failed to load inventory items')
+
+      const ledgerData = await ledgerRes.json()
+      const inventoryData = await inventoryRes.json()
+
+  const nextLedgerEntries = Array.isArray(ledgerData) ? ledgerData : []
+  setLedgerEntries(nextLedgerEntries)
+  setLedgerForm({ ...emptyLedgerForm, reference: getAutoReference('purchase', nextLedgerEntries) })
+      setLinkedItems(Array.isArray(inventoryData) ? (inventoryData as InventoryItem[]).filter((item) => item.supplierId === supplier.id) : [])
+    } catch (error) {
+      console.error('Failed to load supplier ledger:', error)
+      toast.error('Failed to load supplier ledger')
+      setLedgerSupplier(null)
+    } finally {
+      setLedgerLoading(false)
+    }
+  }
+
+  async function handleSaveLedgerEntry(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!ledgerSupplier) return
+
+    const amount = Number(ledgerForm.amount)
+    const quantity = ledgerForm.quantity.trim() ? Number(ledgerForm.quantity) : null
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast.error('Amount must be a non-negative number')
+      return
+    }
+
+    if (quantity !== null && (!Number.isFinite(quantity) || quantity < 0)) {
+      toast.error('Quantity must be a non-negative number')
+      return
+    }
+
+    setLedgerSaving(true)
+    try {
+      const res = await apiFetch(`/api/suppliers/${ledgerSupplier.id}/ledger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: ledgerForm.type,
+          reference: ledgerForm.reference,
+          inventoryItemId: ledgerForm.inventoryItemId || null,
+          quantity,
+          amount,
+          notes: ledgerForm.notes,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to save supplier entry')
+
+      const created = (await res.json()) as SupplierLedgerEntry
+      setLedgerEntries((current) => {
+        const next = [created, ...current]
+        setLedgerForm((form) => ({
+          ...emptyLedgerForm,
+          type: form.type,
+          reference: getAutoReference(form.type, next),
+        }))
+        return next
+      })
+      toast.success('Supplier ledger updated')
+      await loadData()
+    } catch (error: any) {
+      console.error('Failed to save supplier ledger entry:', error)
+      toast.error(error.message || 'Failed to save supplier ledger entry')
+    } finally {
+      setLedgerSaving(false)
+    }
+  }
+
+  const visibleLedgerEntries = useMemo(() => {
+    const now = new Date()
+    const cutoff =
+      ledgerDateRange === 'all'
+        ? null
+        : new Date(now.getTime() - (ledgerDateRange === '7days' ? 7 : ledgerDateRange === '30days' ? 30 : 90) * 24 * 60 * 60 * 1000)
+
+    return ledgerEntries.filter((entry) => {
+      const matchesType = ledgerFilter === 'all' || entry.type === ledgerFilter
+      const matchesDate = !cutoff || new Date(entry.createdAt) >= cutoff
+      return matchesType && matchesDate
+    })
+  }, [ledgerEntries, ledgerFilter, ledgerDateRange])
+
+  const ledgerSummary = useMemo(() => {
+    const purchases = ledgerEntries
+      .filter((entry) => entry.type === 'purchase' || entry.type === 'grn')
+      .reduce((sum, entry) => sum + entry.amount, 0)
+    const returnsAndPayments = ledgerEntries
+      .filter((entry) => entry.type === 'payment' || entry.type === 'return')
+      .reduce((sum, entry) => sum + entry.amount, 0)
+
+    return {
+      purchases,
+      returnsAndPayments,
+      balance: purchases - returnsAndPayments,
+    }
+  }, [ledgerEntries])
+
+  const ledgerTypeLabel: Record<SupplierLedgerEntryType, string> = {
+    purchase: 'Purchase',
+    payment: 'Payment',
+    grn: 'GRN',
+    return: 'Return',
+  }
+
+  const agingSummary = useMemo(() => {
+    const purchaseEntries = [...ledgerEntries]
+      .filter((entry) => entry.type === 'purchase' || entry.type === 'grn')
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      .map((entry) => ({ ...entry, remaining: entry.amount }))
+
+    let creditsToApply = ledgerEntries
+      .filter((entry) => entry.type === 'payment' || entry.type === 'return')
+      .reduce((sum, entry) => sum + entry.amount, 0)
+
+    for (const entry of purchaseEntries) {
+      if (creditsToApply <= 0) break
+      const applied = Math.min(entry.remaining, creditsToApply)
+      entry.remaining -= applied
+      creditsToApply -= applied
+    }
+
+    const buckets = [
+      { label: '0-30 days', min: 0, max: 30, amount: 0 },
+      { label: '31-60 days', min: 31, max: 60, amount: 0 },
+      { label: '61-90 days', min: 61, max: 90, amount: 0 },
+      { label: '90+ days', min: 91, max: Number.POSITIVE_INFINITY, amount: 0 },
+    ]
+
+    const now = Date.now()
+    for (const entry of purchaseEntries) {
+      if (entry.remaining <= 0) continue
+      const ageDays = Math.floor((now - new Date(entry.createdAt).getTime()) / (24 * 60 * 60 * 1000))
+      const bucket = buckets.find((item) => ageDays >= item.min && ageDays <= item.max)
+      if (bucket) bucket.amount += entry.remaining
+    }
+
+    return buckets.map(({ label, amount }) => ({ label, amount }))
+  }, [ledgerEntries])
+
+  function handleLedgerTypeChange(type: SupplierLedgerEntryType) {
+    setLedgerForm((current) => ({
+      ...current,
+      type,
+      reference: getAutoReference(type, ledgerEntries),
+    }))
+  }
+
+  function handlePrintStatement() {
+    if (!ledgerSupplier) return
+    printSupplierStatement(ledgerSupplier, visibleLedgerEntries, settings, ledgerSummary, agingSummary)
+  }
+
   return (
     <div className="space-y-6 p-3 sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -291,6 +514,7 @@ export function SuppliersManager() {
                     <TableHead>Supplier</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Used By</TableHead>
+                    <TableHead>Balance</TableHead>
                     <TableHead>Phone</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -314,6 +538,13 @@ export function SuppliersManager() {
                         </Badge>
                       </TableCell>
                       <TableCell>
+                        <div className="space-y-0.5 text-xs text-muted-foreground">
+                          <div>Purchases: <span className="font-medium text-foreground">{(supplier.totalPurchases ?? 0).toFixed(2)}</span></div>
+                          <div>Payments: <span className="font-medium text-foreground">{(supplier.totalPayments ?? 0).toFixed(2)}</span></div>
+                          <div>Due: <span className="font-medium text-foreground">{(supplier.balanceDue ?? 0).toFixed(2)}</span></div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="outline" className="gap-1">
                           <Phone className="h-3 w-3" />
                           {supplier.phone}
@@ -327,6 +558,10 @@ export function SuppliersManager() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => void openLedger(supplier)} className="gap-1">
+                            <Receipt className="h-4 w-4" />
+                            Ledger
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
@@ -411,6 +646,215 @@ export function SuppliersManager() {
               </Table>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(ledgerSupplier)} onOpenChange={(open) => !open && setLedgerSupplier(null)}>
+        <DialogContent className="max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{ledgerSupplier?.name ?? 'Supplier'} — Purchases, GRN, Returns & Payments</DialogTitle>
+            <DialogDescription>
+              Record supplier transactions and review the running balance.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Add Supplier Entry</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div className="rounded-lg border bg-background p-3">
+                    <div className="text-muted-foreground">Purchases</div>
+                    <div className="font-semibold text-foreground">{ledgerSummary.purchases.toFixed(2)}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-3">
+                    <div className="text-muted-foreground">Paid/Returned</div>
+                    <div className="font-semibold text-foreground">{ledgerSummary.returnsAndPayments.toFixed(2)}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-3">
+                    <div className="text-muted-foreground">Balance</div>
+                    <div className="font-semibold text-foreground">{ledgerSummary.balance.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveLedgerEntry} className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="ledger-type">Entry Type</Label>
+                    <select
+                      id="ledger-type"
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                      value={ledgerForm.type}
+                      onChange={(e) => handleLedgerTypeChange(e.target.value as SupplierLedgerEntryType)}
+                    >
+                      <option value="purchase">Purchase</option>
+                      <option value="grn">GRN</option>
+                      <option value="return">Return</option>
+                      <option value="payment">Payment</option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="ledger-reference">Reference</Label>
+                    <Input
+                      id="ledger-reference"
+                      value={ledgerForm.reference}
+                      onChange={(e) => setLedgerForm((current) => ({ ...current, reference: e.target.value }))}
+                      placeholder="Invoice, voucher, GRN no..."
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="ledger-item">Inventory Item</Label>
+                    <select
+                      id="ledger-item"
+                      className="h-10 rounded-md border bg-background px-3 text-sm"
+                      value={ledgerForm.inventoryItemId}
+                      onChange={(e) => setLedgerForm((current) => ({ ...current, inventoryItemId: e.target.value }))}
+                    >
+                      <option value="">No linked item</option>
+                      {linkedItems.map((item) => (
+                        <option key={item.id} value={item.id}>{item.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="ledger-quantity">Quantity</Label>
+                      <Input
+                        id="ledger-quantity"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={ledgerForm.quantity}
+                        onChange={(e) => setLedgerForm((current) => ({ ...current, quantity: e.target.value }))}
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="ledger-amount">Amount</Label>
+                      <Input
+                        id="ledger-amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={ledgerForm.amount}
+                        onChange={(e) => setLedgerForm((current) => ({ ...current, amount: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="ledger-notes">Notes</Label>
+                    <Textarea
+                      id="ledger-notes"
+                      rows={3}
+                      value={ledgerForm.notes}
+                      onChange={(e) => setLedgerForm((current) => ({ ...current, notes: e.target.value }))}
+                      placeholder="Optional notes"
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full gap-2" disabled={ledgerSaving}>
+                    {ledgerForm.type === 'purchase' && <PackagePlus className="h-4 w-4" />}
+                    {ledgerForm.type === 'grn' && <Receipt className="h-4 w-4" />}
+                    {ledgerForm.type === 'return' && <ArrowLeftRight className="h-4 w-4" />}
+                    {ledgerForm.type === 'payment' && <Wallet className="h-4 w-4" />}
+                    {ledgerSaving ? 'Saving...' : `Add ${ledgerTypeLabel[ledgerForm.type]}`}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-lg">Supplier Ledger</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintStatement}>
+                      <Printer className="h-4 w-4" />
+                      Print Statement
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_auto]">
+                  <div className="flex flex-wrap gap-2">
+                    {(['all', 'purchase', 'grn', 'return', 'payment'] as const).map((filter) => (
+                      <Button
+                        key={filter}
+                        variant={ledgerFilter === filter ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setLedgerFilter(filter)}
+                      >
+                        {filter === 'all' ? 'All' : filter === 'grn' ? 'GRN' : filter[0].toUpperCase() + filter.slice(1)}
+                      </Button>
+                    ))}
+                  </div>
+                  <select
+                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                    value={ledgerDateRange}
+                    onChange={(e) => setLedgerDateRange(e.target.value as LedgerDateRange)}
+                  >
+                    <option value="all">All dates</option>
+                    <option value="7days">Last 7 days</option>
+                    <option value="30days">Last 30 days</option>
+                    <option value="90days">Last 90 days</option>
+                  </select>
+                </div>
+
+                <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-sm">
+                  {agingSummary.map((bucket) => (
+                    <div key={bucket.label} className="rounded-lg border bg-background p-3">
+                      <div className="text-muted-foreground">{bucket.label}</div>
+                      <div className="font-semibold text-foreground">{settings.currencySymbol}{bucket.amount.toFixed(2)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {ledgerLoading ? (
+                  <div className="py-10 text-center text-muted-foreground">Loading ledger...</div>
+                ) : visibleLedgerEntries.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground">No ledger entries found.</div>
+                ) : (
+                  <div className="max-h-[520px] overflow-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead>Qty</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {visibleLedgerEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell className="whitespace-nowrap">{new Date(entry.createdAt).toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge variant={entry.type === 'payment' ? 'secondary' : entry.type === 'return' ? 'outline' : 'default'}>
+                                {ledgerTypeLabel[entry.type]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{entry.reference || '—'}</TableCell>
+                            <TableCell>{entry.quantity ?? '—'}</TableCell>
+                            <TableCell>{entry.amount.toFixed(2)}</TableCell>
+                            <TableCell className="max-w-[260px] truncate text-muted-foreground">{entry.notes || '—'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

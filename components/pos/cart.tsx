@@ -51,7 +51,7 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
   const [quickAddNotes, setQuickAddNotes] = useState('')
   const [quickAddSaving, setQuickAddSaving] = useState(false)
 
-  const { subtotal, tax, total } = getCartTotal()
+  const { subtotal, tax: serviceCharge, total } = getCartTotal()
   const filteredCustomers = useMemo(() => {
     const query = customerSearch.trim().toLowerCase()
     if (!query) return customers
@@ -324,10 +324,12 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
             <span>Subtotal</span>
             <span>{settings.currencySymbol}{subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-muted-foreground">
-            <span>Tax ({settings.taxRate}%)</span>
-            <span>{settings.currencySymbol}{tax.toFixed(2)}</span>
-          </div>
+          {serviceCharge > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Service Charge ({settings.taxRate}%)</span>
+              <span>{settings.currencySymbol}{serviceCharge.toFixed(2)}</span>
+            </div>
+          )}
           <Separator />
           <div className="flex justify-between text-lg font-bold text-foreground">
             <span>Total</span>

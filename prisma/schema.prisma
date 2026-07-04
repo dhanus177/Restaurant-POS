@@ -34,6 +34,7 @@ model MenuItem {
   description    String?
   image          String?
   isAvailable    Boolean         @default(true)
+  applyServiceCharge Boolean     @default(false)
   modifierGroups ModifierGroup[]
   recipes        ProductRecipe[]
 }
@@ -121,6 +122,24 @@ model Supplier {
   email          String
   phone          String
   inventoryItems InventoryItem[]
+  ledgerEntries  SupplierLedgerEntry[]
+}
+
+model SupplierLedgerEntry {
+  id              String   @id @default(cuid())
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  type            String
+  reference       String?
+  inventoryItemId String?
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  quantity        Float?
+  amount          Float
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([supplierId])
+  @@index([type])
 }
 
 model InventoryItem {
@@ -137,6 +156,7 @@ model InventoryItem {
   category      String
   adjustments   StockAdjustment[]
   recipes       ProductRecipe[]   @relation("RecipeIngredient")
+  supplierLedgerEntries SupplierLedgerEntry[]
 }
 
 model ProductRecipe {
@@ -173,6 +193,39 @@ model Settings {
   currencySymbol String
   receiptFooter  String
   logo           String?
+}
+
+model CashDrawer {
+  id             String   @id @default("singleton")
+  openingBalance Float    @default(0)
+  notes          String?
+  openedAt       DateTime?
+  updatedAt      DateTime @updatedAt
+  expenses       CashDrawerExpense[]
+}
+
+model CashDrawerExpense {
+  id          String   @id @default(cuid())
+  drawerId    String   @default("singleton")
+  drawer      CashDrawer @relation(fields: [drawerId], references: [id], onDelete: Cascade)
+  amount      Float
+  reason      String
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  @@index([drawerId])
+  @@index([createdAt])
+}
+
+model CashDrawerReport {
+  id             String   @id @default(cuid())
+  openingBalance Float
+  expectedBalance Float
+  countedCash    Float
+  variance       Float
+  notes          String?
+  closedAt       DateTime @default(now())
+  closedBy       String
 }
 
 model License {

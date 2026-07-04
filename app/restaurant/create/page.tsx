@@ -21,6 +21,7 @@ import {
 import { toast } from 'sonner'
 
 const currencies = [
+  { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
   { code: 'GBP', symbol: '£', name: 'British Pound' },
@@ -38,8 +39,8 @@ export default function CreateRestaurantPage() {
       address: settings.address ?? '',
       phone: settings.phone ?? '',
       taxRate: settings.taxRate ?? 0,
-      currency: settings.currency ?? 'USD',
-      currencySymbol: settings.currencySymbol ?? '$',
+      currency: settings.currency ?? 'LKR',
+      currencySymbol: settings.currencySymbol ?? 'Rs',
       receiptFooter: settings.receiptFooter ?? '',
       logo: settings.logo ?? '',
     }),
@@ -296,7 +297,7 @@ export default function CreateRestaurantPage() {
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="tax-rate">Tax Rate (%)</Label>
+                <Label htmlFor="tax-rate">Service Charge Rate (%)</Label>
                 <Input
                   id="tax-rate"
                   type="number"

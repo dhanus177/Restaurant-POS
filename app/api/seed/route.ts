@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       await prisma.$transaction([
         prisma.license.deleteMany(),
         prisma.stockAdjustment.deleteMany(),
+        prisma.supplierLedgerEntry.deleteMany(),
         prisma.productRecipe.deleteMany(),
         prisma.orderItem.deleteMany(),
         prisma.order.deleteMany(),
@@ -37,6 +38,9 @@ export async function POST(req: Request) {
         prisma.restaurantTable.deleteMany(),
         prisma.inventoryItem.deleteMany(),
         prisma.supplier.deleteMany(),
+        prisma.cashDrawer.deleteMany(),
+        prisma.cashDrawerExpense.deleteMany(),
+        prisma.cashDrawerReport.deleteMany(),
         prisma.category.deleteMany(),
         prisma.user.deleteMany(),
         prisma.customer.deleteMany(),
@@ -131,6 +135,16 @@ export async function POST(req: Request) {
 
     // Settings
     await prisma.settings.create({ data: { id: 'singleton', ...mockSettings, logo: mockSettings.logo ?? '' } })
+
+    // Cash drawer
+    await prisma.cashDrawer.create({
+      data: {
+        id: 'singleton',
+        openingBalance: 0,
+        notes: 'Initial drawer balance',
+        openedAt: new Date(),
+      },
+    })
 
     return NextResponse.json({ message: 'Database seeded successfully', force })
   } catch (err) {

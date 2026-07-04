@@ -28,6 +28,7 @@ type SetupStatus = {
 }
 
 const currencies = [
+  { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '€', name: 'Euro' },
   { code: 'GBP', symbol: '£', name: 'British Pound' },
@@ -49,8 +50,8 @@ export default function SetupPage() {
     address: '',
     phone: '',
     taxRate: 0,
-    currency: 'USD',
-    currencySymbol: '$',
+    currency: 'LKR',
+    currencySymbol: 'Rs',
     receiptFooter: 'Thank you for dining with us!',
     logo: '',
   })
@@ -315,7 +316,7 @@ export default function SetupPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="grid gap-2">
-                      <Label htmlFor="tax-rate">Tax Rate (%)</Label>
+                      <Label htmlFor="tax-rate">Service Charge Rate (%)</Label>
                       <Input
                         id="tax-rate"
                         type="number"

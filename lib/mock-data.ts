@@ -59,6 +59,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-1',
     description: 'Herb-marinated grilled chicken with seasonal vegetables',
     isAvailable: true,
+    applyServiceCharge: true,
     modifierGroups: [
       {
         id: 'mg-1',
@@ -81,6 +82,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-1',
     description: 'Pan-seared Atlantic salmon with lemon butter sauce',
     isAvailable: true,
+    applyServiceCharge: true,
     modifierGroups: [
       {
         id: 'mg-2',
@@ -101,6 +103,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-1',
     description: 'Premium ribeye steak cooked to perfection',
     isAvailable: true,
+    applyServiceCharge: true,
     modifierGroups: [
       {
         id: 'mg-3',
@@ -134,6 +137,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-1',
     description: 'Creamy bacon pasta with parmesan',
     isAvailable: true,
+    applyServiceCharge: true,
   },
   // Burgers
   {
@@ -143,6 +147,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-2',
     description: 'Beef patty with lettuce, tomato, and special sauce',
     isAvailable: true,
+    applyServiceCharge: true,
     modifierGroups: [
       {
         id: 'mg-5',
@@ -166,6 +171,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-2',
     description: 'Crispy chicken fillet with mayo and lettuce',
     isAvailable: true,
+    applyServiceCharge: true,
   },
   {
     id: 'item-7',
@@ -174,6 +180,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-2',
     description: 'Plant-based patty with fresh vegetables',
     isAvailable: true,
+    applyServiceCharge: true,
   },
   {
     id: 'item-8',
@@ -182,6 +189,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-2',
     description: 'Beef patty with BBQ sauce, bacon, and onion rings',
     isAvailable: false,
+    applyServiceCharge: true,
   },
   // Sides
   {
@@ -295,6 +303,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-5',
     description: 'Rich chocolate layer cake',
     isAvailable: true,
+    applyServiceCharge: true,
     modifierGroups: [
       {
         id: 'mg-9',
@@ -315,6 +324,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-5',
     description: 'New York style cheesecake',
     isAvailable: true,
+    applyServiceCharge: true,
   },
   {
     id: 'item-19',
@@ -323,6 +333,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-5',
     description: '2 scoops of your choice',
     isAvailable: true,
+    applyServiceCharge: true,
   },
   {
     id: 'item-20',
@@ -331,6 +342,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-5',
     description: 'Warm apple pie with cinnamon',
     isAvailable: true,
+    applyServiceCharge: true,
   },
 ]
 
@@ -415,8 +427,8 @@ export const mockSettings: Settings = {
   address: '123 Main Street, Downtown',
   phone: '(555) 123-4567',
   taxRate: 10,
-  currency: 'USD',
-  currencySymbol: '$',
+  currency: 'LKR',
+  currencySymbol: 'Rs',
   receiptFooter: 'Thank you for dining with us!',
   logo: '',
 }

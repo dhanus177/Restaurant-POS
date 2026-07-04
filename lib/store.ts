@@ -26,6 +26,9 @@ import type {
   Order,
   OrderItem,
   InventoryItem,
+  CashDrawer,
+  CashDrawerExpense,
+  CashDrawerReport,
   Settings,
   Supplier,
   OrderStatus,
@@ -138,6 +141,9 @@ interface POSStore {
   // Inventory
   inventory: InventoryItem[]
   suppliers: Supplier[]
+  cashDrawer: CashDrawer | null
+  cashDrawerExpenses: CashDrawerExpense[]
+  cashDrawerReports: CashDrawerReport[]
   stockAdjustments: StockAdjustment[]
   addInventoryItem: (item: InventoryItem) => void
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void
@@ -146,6 +152,9 @@ interface POSStore {
   addSupplier: (supplier: Supplier) => void
   updateSupplier: (id: string, supplier: Partial<Supplier>) => void
   deleteSupplier: (id: string) => void
+  updateCashDrawer: (cashDrawer: Partial<CashDrawer>) => void
+  addCashDrawerExpense: (expense: Pick<CashDrawerExpense, 'amount' | 'reason' | 'createdBy'>) => Promise<CashDrawerExpense | null>
+  createCashDrawerReport: (report: Omit<CashDrawerReport, 'id' | 'closedAt'> & { closedAt?: string }) => Promise<CashDrawerReport | null>
 
   // Settings
   settings: Settings
@@ -156,6 +165,7 @@ interface POSStore {
 
   // Helpers
   getCartTotal: () => { subtotal: number; tax: number; total: number }
+  getCashDrawerBalance: () => { openingBalance: number; cashSales: number; cashRefunds: number; currentBalance: number }
   getLowStockItems: () => InventoryItem[]
   getTodayOrders: () => Order[]
   getTodaySales: () => number
@@ -407,6 +417,9 @@ const response = await apiFetch('/api/auth/me', {
       // Inventory
       inventory: mockInventory,
       suppliers: mockSuppliers,
+      cashDrawer: null,
+      cashDrawerExpenses: [],
+      cashDrawerReports: [],
       stockAdjustments: [],
       addInventoryItem: (item) => {
         const normalized: InventoryItem = {
@@ -502,6 +515,62 @@ const response = await apiFetch('/api/auth/me', {
         set((state) => ({ suppliers: state.suppliers.filter((s) => s.id !== id) }))
         dbSync('DELETE', `/api/suppliers/${id}`)
       },
+      updateCashDrawer: (cashDrawerData) => {
+        set((state) => ({
+          cashDrawer: {
+            id: 'singleton',
+            openingBalance: state.cashDrawer?.openingBalance ?? 0,
+            notes: state.cashDrawer?.notes,
+            openedAt: state.cashDrawer?.openedAt,
+            ...state.cashDrawer,
+            ...cashDrawerData,
+            updatedAt: new Date().toISOString(),
+          },
+        }))
+        dbSync('PATCH', '/api/cash-drawer', cashDrawerData)
+      },
+      addCashDrawerExpense: async (expenseInput) => {
+        try {
+          const response = await apiFetch('/api/cash-drawer/expenses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(expenseInput),
+          })
+
+          if (!response.ok) {
+            return null
+          }
+
+          const created = (await response.json()) as CashDrawerExpense
+          set((state) => ({ cashDrawerExpenses: [created, ...state.cashDrawerExpenses] }))
+          return created
+        } catch (error) {
+          console.error('[addCashDrawerExpense error]', error)
+          return null
+        }
+      },
+      createCashDrawerReport: async (reportInput) => {
+        try {
+          const response = await apiFetch('/api/cash-drawer/reports', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reportInput),
+          })
+
+          if (!response.ok) {
+            return null
+          }
+
+          const created = (await response.json()) as CashDrawerReport
+          set((state) => ({
+            cashDrawerReports: [created, ...state.cashDrawerReports.filter((report) => report.id !== created.id)],
+          }))
+          return created
+        } catch (error) {
+          console.error('[createCashDrawerReport error]', error)
+          return null
+        }
+      },
 
       // Settings
       settings: mockSettings,
@@ -514,7 +583,7 @@ const response = await apiFetch('/api/auth/me', {
       loadFromDB: async () => {
         try {
           await get().refreshCurrentUser()
-          const [users, customers, categories, menuItems, tables, orders, inventory, suppliers, stockAdjustments, settings] =
+          const [users, customers, categories, menuItems, tables, orders, inventory, suppliers, cashDrawer, cashDrawerExpenses, cashDrawerReports, stockAdjustments, settings] =
             await Promise.all([
               apiFetch('/api/users').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               apiFetch('/api/customers').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
@@ -524,6 +593,9 @@ const response = await apiFetch('/api/auth/me', {
               apiFetch('/api/orders').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               apiFetch('/api/inventory').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               apiFetch('/api/suppliers').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/cash-drawer').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/cash-drawer/expenses').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
+              apiFetch('/api/cash-drawer/reports').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               apiFetch('/api/stock-adjustments').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
               apiFetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
             ])
@@ -564,6 +636,9 @@ const response = await apiFetch('/api/auth/me', {
             orders: Array.isArray(orders) ? orders : get().orders,
             inventory: incomingInventory,
             suppliers: Array.isArray(suppliers) ? suppliers : get().suppliers,
+            cashDrawer: cashDrawer && !cashDrawer.error ? cashDrawer : get().cashDrawer,
+            cashDrawerExpenses: Array.isArray(cashDrawerExpenses) ? cashDrawerExpenses : get().cashDrawerExpenses,
+            cashDrawerReports: Array.isArray(cashDrawerReports) ? cashDrawerReports : get().cashDrawerReports,
             stockAdjustments: mergedAdjustments,
             settings: settings && !settings.error ? settings : get().settings,
           })
@@ -580,11 +655,47 @@ const response = await apiFetch('/api/auth/me', {
           const modifiersTotal = item.modifiers.reduce((m, mod) => m + mod.price, 0) * item.quantity
           return sum + itemTotal + modifiersTotal
         }, 0)
-        const tax = subtotal * (state.settings.taxRate / 100)
+        const serviceChargeBase = state.cart.reduce((sum, item) => {
+          if (!item.serviceChargeApplicable || !state.selectedTable) return sum
+          const itemTotal = item.price * item.quantity
+          const modifiersTotal = item.modifiers.reduce((m, mod) => m + mod.price, 0) * item.quantity
+          return sum + itemTotal + modifiersTotal
+        }, 0)
+        const tax = serviceChargeBase * (state.settings.taxRate / 100)
         return { subtotal, tax, total: subtotal + tax }
       },
       getLowStockItems: () => {
         return get().inventory.filter((item) => item.quantity <= item.minQuantity)
+      },
+      getCashDrawerBalance: () => {
+        const state = get()
+        const openedAt = state.cashDrawer?.openedAt ? new Date(state.cashDrawer.openedAt) : null
+        const openingBalance = state.cashDrawer?.openingBalance ?? 0
+        const cashSales = state.orders
+          .filter(
+            (o) =>
+              o.paymentStatus === 'paid' &&
+              o.paymentMethod === 'cash' &&
+              (!openedAt || new Date(o.createdAt) >= openedAt)
+          )
+          .reduce((sum, o) => sum + o.total, 0)
+        const cashRefunds = state.orders
+          .filter(
+            (o) =>
+              o.paymentStatus === 'refunded' &&
+              o.paymentMethod === 'cash' &&
+              (!openedAt || new Date(o.updatedAt) >= openedAt)
+          )
+          .reduce((sum, o) => sum + o.total, 0)
+        const cashOuts = state.cashDrawerExpenses
+          .filter((expense) => !openedAt || new Date(expense.createdAt) >= openedAt)
+          .reduce((sum, expense) => sum + expense.amount, 0)
+        return {
+          openingBalance,
+          cashSales,
+          cashRefunds,
+          currentBalance: openingBalance + cashSales - cashRefunds - cashOuts,
+        }
       },
       getTodayOrders: () => {
         const today = new Date()
@@ -610,6 +721,9 @@ const response = await apiFetch('/api/auth/me', {
         tables: state.tables,
         inventory: state.inventory,
         suppliers: state.suppliers,
+        cashDrawer: state.cashDrawer,
+        cashDrawerExpenses: state.cashDrawerExpenses,
+        cashDrawerReports: state.cashDrawerReports,
         stockAdjustments: state.stockAdjustments,
         settings: state.settings,
       }),

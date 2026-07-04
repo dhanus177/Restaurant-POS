@@ -21,6 +21,7 @@ import {
   Tags,
   WalletCards,
   ShoppingBag,
+  ReceiptText,
 } from 'lucide-react'
 import { usePOSStore } from '@/lib/store'
 
@@ -34,6 +35,7 @@ const navItems = [
   { href: '/admin/tables', label: 'Tables', icon: Grid3X3 },
   { href: '/admin/staff', label: 'Staff', icon: Users },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/admin/cash-drawer-reports', label: 'Cash Drawer Reports', icon: ReceiptText },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ]
 

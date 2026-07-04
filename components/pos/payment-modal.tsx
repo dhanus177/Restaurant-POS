@@ -181,10 +181,12 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
                 <span className="text-muted-foreground">Subtotal</span>
                 <span>{settings.currencySymbol}{subtotal.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Tax ({settings.taxRate}%)</span>
-                <span>{settings.currencySymbol}{tax.toFixed(2)}</span>
-              </div>
+              {tax > 0 && (
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Service Charge ({settings.taxRate}%)</span>
+                  <span>{settings.currencySymbol}{tax.toFixed(2)}</span>
+                </div>
+              )}
               <Separator className="my-2" />
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>

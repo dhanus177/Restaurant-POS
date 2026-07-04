@@ -49,6 +49,7 @@ export default function MenuManagementPage() {
     price: 0,
     categoryId: '',
     isAvailable: true,
+    applyServiceCharge: false,
   })
 
   const filteredItems = menuItems.filter((item) => {
@@ -65,6 +66,7 @@ export default function MenuManagementPage() {
       price: item.price,
       categoryId: item.categoryId,
       isAvailable: item.isAvailable,
+      applyServiceCharge: item.applyServiceCharge ?? false,
     })
     setShowForm(true)
   }
@@ -77,6 +79,7 @@ export default function MenuManagementPage() {
       price: 0,
       categoryId: categories[0]?.id || '',
       isAvailable: true,
+      applyServiceCharge: false,
     })
     setShowForm(true)
   }
@@ -178,6 +181,7 @@ export default function MenuManagementPage() {
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{getCategoryName(item.categoryId)}</Badge>
+                    {item.applyServiceCharge && <Badge variant="secondary">Service Charge</Badge>}
                     {!item.isAvailable && (
                       <Badge variant="secondary">Unavailable</Badge>
                     )}
@@ -212,6 +216,7 @@ export default function MenuManagementPage() {
                 <th className="p-3 text-left">Item</th>
                 <th className="p-3 text-left">Category</th>
                 <th className="p-3 text-left">Price</th>
+                <th className="p-3 text-left">Service Charge</th>
                 <th className="p-3 text-left">Available</th>
                 <th className="p-3 text-right">Actions</th>
               </tr>
@@ -225,6 +230,7 @@ export default function MenuManagementPage() {
                   </td>
                   <td className="p-3"><Badge variant="outline">{getCategoryName(item.categoryId)}</Badge></td>
                   <td className="p-3">{settings.currencySymbol}{item.price.toFixed(2)}</td>
+                  <td className="p-3">{item.applyServiceCharge ? 'Yes' : 'No'}</td>
                   <td className="p-3">
                     <Switch checked={item.isAvailable} onCheckedChange={() => toggleItemAvailability(item.id)} />
                   </td>
@@ -306,6 +312,13 @@ export default function MenuManagementPage() {
                 onCheckedChange={(checked) => setFormData({ ...formData, isAvailable: checked })}
               />
               <Label>Available</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={formData.applyServiceCharge}
+                onCheckedChange={(checked) => setFormData({ ...formData, applyServiceCharge: checked })}
+              />
+              <Label>Apply service charge</Label>
             </div>
             <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowForm(false)}>

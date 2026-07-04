@@ -15,7 +15,11 @@ type BackupPayload = {
     orders?: any[]
     orderItems?: any[]
     suppliers?: any[]
+    supplierLedgerEntries?: any[]
     inventoryItems?: any[]
+    cashDrawers?: any[]
+    cashDrawerExpenses?: any[]
+    cashDrawerReports?: any[]
     productRecipes?: any[]
     stockAdjustments?: any[]
     settings?: any[]
@@ -44,6 +48,7 @@ export async function POST(req: Request) {
     await tx.orderItem.deleteMany()
     await tx.order.deleteMany()
     await tx.stockAdjustment.deleteMany()
+    await tx.supplierLedgerEntry.deleteMany()
     await tx.productRecipe.deleteMany()
     await tx.modifier.deleteMany()
     await tx.modifierGroup.deleteMany()
@@ -51,6 +56,9 @@ export async function POST(req: Request) {
     await tx.category.deleteMany()
     await tx.inventoryItem.deleteMany()
     await tx.supplier.deleteMany()
+    await tx.cashDrawer.deleteMany()
+    await tx.cashDrawerExpense.deleteMany()
+    await tx.cashDrawerReport.deleteMany()
     await tx.restaurantTable.deleteMany()
     await tx.user.deleteMany()
     await tx.customer.deleteMany()
@@ -68,7 +76,11 @@ export async function POST(req: Request) {
     if (data.orders?.length) await tx.order.createMany({ data: data.orders })
     if (data.orderItems?.length) await tx.orderItem.createMany({ data: data.orderItems })
     if (data.suppliers?.length) await tx.supplier.createMany({ data: data.suppliers })
+    if (data.supplierLedgerEntries?.length) await tx.supplierLedgerEntry.createMany({ data: data.supplierLedgerEntries })
     if (data.inventoryItems?.length) await tx.inventoryItem.createMany({ data: data.inventoryItems })
+    if (data.cashDrawers?.length) await tx.cashDrawer.createMany({ data: data.cashDrawers })
+    if (data.cashDrawerExpenses?.length) await tx.cashDrawerExpense.createMany({ data: data.cashDrawerExpenses })
+    if (data.cashDrawerReports?.length) await tx.cashDrawerReport.createMany({ data: data.cashDrawerReports })
     if (data.productRecipes?.length) await tx.productRecipe.createMany({ data: data.productRecipes })
     if (data.stockAdjustments?.length) await tx.stockAdjustment.createMany({ data: data.stockAdjustments })
     if (data.settings?.length) await tx.settings.createMany({ data: data.settings })

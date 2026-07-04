@@ -1,4 +1,4 @@
-import type { Order, Settings } from './types'
+import type { Order, Settings, Supplier, SupplierLedgerEntry } from './types'
 
 export function generateBillCode(orderNumber: number, createdAt: string | Date): string {
   const d = new Date(createdAt)
@@ -120,10 +120,11 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
           <td>Subtotal</td>
           <td style="text-align: right;">${formatCurrency(order.subtotal, settings.currencySymbol)}</td>
         </tr>
+        ${order.tax > 0 ? `
         <tr>
-          <td>Tax (${settings.taxRate}%)</td>
+          <td>Service Charge (${settings.taxRate}%)</td>
           <td style="text-align: right;">${formatCurrency(order.tax, settings.currencySymbol)}</td>
-        </tr>
+        </tr>` : ''}
         <tr class="total-row">
           <td>TOTAL</td>
           <td style="text-align: right;">${formatCurrency(order.total, settings.currencySymbol)}</td>
@@ -212,5 +213,133 @@ export function printReceipt(order: Order, settings: Settings): void {
 
 export function printKitchenDocket(order: Order, settings: Settings): void {
   const html = generateKitchenDocketHTML(order, settings)
+  printDocument(html)
+}
+
+export function generateSupplierStatementHTML(
+  supplier: Supplier,
+  entries: SupplierLedgerEntry[],
+  settings: Settings,
+  summary: { purchases: number; returnsAndPayments: number; balance: number },
+  aging: Array<{ label: string; amount: number }>
+): string {
+  const rows = entries
+    .map(
+      (entry) => `
+    <tr>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${formatDateTime(entry.createdAt)}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-transform: uppercase;">${entry.type}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${entry.reference ?? '-'}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right;">${entry.quantity ?? '-'}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(entry.amount, settings.currencySymbol)}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${entry.notes ?? '-'}</td>
+    </tr>`
+    )
+    .join('')
+
+  const agingRows = aging
+    .map(
+      (bucket) => `
+      <tr>
+        <td style="padding: 4px 0;">${bucket.label}</td>
+        <td style="padding: 4px 0; text-align: right;">${formatCurrency(bucket.amount, settings.currencySymbol)}</td>
+      </tr>`
+    )
+    .join('')
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Supplier Statement - ${supplier.name}</title>
+      <style>
+        body { font-family: Arial, sans-serif; font-size: 12px; margin: 0 auto; padding: 24px; color: #111; }
+        h1, h2, h3 { margin: 0; }
+        .header { margin-bottom: 20px; }
+        .muted { color: #666; }
+        .summary, .aging { margin: 16px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 8px 4px; border-bottom: 2px solid #111; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+        .stat { border: 1px solid #ddd; padding: 10px; border-radius: 8px; }
+        .footer { margin-top: 24px; color: #666; font-size: 11px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${settings.restaurantName}</h1>
+        <div class="muted">${settings.address}</div>
+        <div class="muted">${settings.phone}</div>
+      </div>
+
+      <div>
+        <h2>Supplier Statement</h2>
+        <div class="muted">Generated: ${formatDateTime(new Date())}</div>
+      </div>
+
+      <div style="margin-top: 12px;">
+        <strong>${supplier.name}</strong><br />
+        Contact: ${supplier.contact}<br />
+        Phone: ${supplier.phone}<br />
+        Email: ${supplier.email}
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="muted">Purchases + GRN</div>
+          <div><strong>${formatCurrency(summary.purchases, settings.currencySymbol)}</strong></div>
+        </div>
+        <div class="stat">
+          <div class="muted">Payments + Returns</div>
+          <div><strong>${formatCurrency(summary.returnsAndPayments, settings.currencySymbol)}</strong></div>
+        </div>
+        <div class="stat">
+          <div class="muted">Balance Due</div>
+          <div><strong>${formatCurrency(summary.balance, settings.currencySymbol)}</strong></div>
+        </div>
+      </div>
+
+      <div class="aging">
+        <h3>Aging Summary</h3>
+        <table>
+          <tbody>
+            ${agingRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <h3>Ledger Entries</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Reference</th>
+              <th style="text-align: right;">Qty</th>
+              <th style="text-align: right;">Amount</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || '<tr><td colspan="6" style="padding: 12px 4px;">No ledger entries found.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="footer">${settings.receiptFooter}</div>
+    </body>
+    </html>
+  `
+}
+
+export function printSupplierStatement(
+  supplier: Supplier,
+  entries: SupplierLedgerEntry[],
+  settings: Settings,
+  summary: { purchases: number; returnsAndPayments: number; balance: number },
+  aging: Array<{ label: string; amount: number }>
+): void {
+  const html = generateSupplierStatementHTML(supplier, entries, settings, summary, aging)
   printDocument(html)
 }

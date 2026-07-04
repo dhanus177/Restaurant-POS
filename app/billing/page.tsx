@@ -48,6 +48,14 @@ export default function BillingPage() {
   }, [cart.length, mounted, router])
 
   const { subtotal } = getCartTotal()
+  const serviceChargeEligibleSubtotal = useMemo(
+    () => cart.reduce((sum, item) => {
+      if (!item.serviceChargeApplicable) return sum
+      const modifiersTotal = item.modifiers.reduce((modifierSum, modifier) => modifierSum + modifier.price, 0) * item.quantity
+      return sum + item.price * item.quantity + modifiersTotal
+    }, 0),
+    [cart]
+  )
   const discountRaw = Number(discountInput) || 0
   const discountAmount = useMemo(() => {
     if (discountRaw <= 0) return 0
@@ -57,7 +65,10 @@ export default function BillingPage() {
     return Math.min(subtotal, discountRaw)
   }, [discountRaw, discountType, subtotal])
   const discountedSubtotal = Math.max(0, subtotal - discountAmount)
-  const tax = discountedSubtotal * (settings.taxRate / 100)
+  const discountedEligibleSubtotal = subtotal > 0
+    ? Math.max(0, serviceChargeEligibleSubtotal - (discountAmount * (serviceChargeEligibleSubtotal / subtotal)))
+    : 0
+  const tax = selectedTable ? discountedEligibleSubtotal * (settings.taxRate / 100) : 0
   const total = discountedSubtotal + tax
   const perCustomer = useMemo(() => total / Math.max(currentCustomerCount, 1), [currentCustomerCount, total])
   const nextOrderNumber = getNextOrderNumber()
@@ -237,7 +248,7 @@ export default function BillingPage() {
 
                 <div className="flex justify-between"><span>Subtotal</span><span>{settings.currencySymbol}{subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between text-emerald-600"><span>Discount</span><span>- {settings.currencySymbol}{discountAmount.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Tax ({settings.taxRate}%)</span><span>{settings.currencySymbol}{tax.toFixed(2)}</span></div>
+                {tax > 0 && <div className="flex justify-between"><span>Service Charge ({settings.taxRate}%)</span><span>{settings.currencySymbol}{tax.toFixed(2)}</span></div>}
                 <div className="flex justify-between font-semibold text-foreground"><span>Final total</span><span>{settings.currencySymbol}{total.toFixed(2)}</span></div>
               </div>
             </CardContent>

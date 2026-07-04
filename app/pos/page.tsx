@@ -50,6 +50,7 @@ export default function POSPage() {
         quantity: 1,
         price: item.price,
         modifiers: [],
+        serviceChargeApplicable: item.applyServiceCharge,
       })
     }
   }
@@ -62,6 +63,7 @@ export default function POSPage() {
       quantity,
       price: item.price,
       modifiers,
+      serviceChargeApplicable: item.applyServiceCharge,
     })
     setShowModifiers(false)
     setSelectedItem(null)

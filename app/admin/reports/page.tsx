@@ -26,13 +26,16 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Banknote, Download, FileSpreadsheet, FileText } from 'lucide-react'
+import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Banknote, Download, FileSpreadsheet, FileText, ListFilter } from 'lucide-react'
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))']
+
+type ReportView = 'all' | 'cash-sale' | 'card-sale' | 'void-return-cancel' | 'delivery' | 'service-charges' | 'complimentary' | 'kot-accepted' | 'kot-canceled'
 
 export default function ReportsPage() {
   const { orders, categories, settings } = usePOSStore()
   const [dateRange, setDateRange] = useState('7days')
+  const [reportView, setReportView] = useState<ReportView>('all')
 
   // Filter orders by date range
   const filteredOrders = useMemo(() => {
@@ -43,9 +46,32 @@ export default function ReportsPage() {
     return orders.filter((o) => new Date(o.createdAt) >= startDate)
   }, [orders, dateRange])
 
+  const filteredReportOrders = useMemo(() => {
+    switch (reportView) {
+      case 'cash-sale':
+        return filteredOrders.filter((o) => o.paymentStatus === 'paid' && o.paymentMethod === 'cash')
+      case 'card-sale':
+        return filteredOrders.filter((o) => o.paymentStatus === 'paid' && o.paymentMethod === 'card')
+      case 'void-return-cancel':
+        return filteredOrders.filter((o) => o.status === 'cancelled' || o.paymentStatus === 'refunded')
+      case 'delivery':
+        return filteredOrders.filter((o) => (o.tableName || '').toLowerCase().includes('delivery'))
+      case 'service-charges':
+        return filteredOrders.filter((o) => o.tax > 0)
+      case 'complimentary':
+        return filteredOrders.filter((o) => o.total === 0)
+      case 'kot-accepted':
+        return filteredOrders.filter((o) => ['preparing', 'ready', 'completed'].includes(o.status))
+      case 'kot-canceled':
+        return filteredOrders.filter((o) => o.status === 'cancelled')
+      default:
+        return filteredOrders
+    }
+  }, [filteredOrders, reportView])
+
   // Calculate totals
   const totals = useMemo(() => {
-    const paidOrders = filteredOrders.filter((o) => o.paymentStatus === 'paid')
+    const paidOrders = filteredReportOrders.filter((o) => o.paymentStatus === 'paid')
     const totalSales = paidOrders.reduce((sum, o) => sum + o.total, 0)
     const totalTax = paidOrders.reduce((sum, o) => sum + o.tax, 0)
     const cashSales = paidOrders
@@ -64,13 +90,13 @@ export default function ReportsPage() {
       orderCount: paidOrders.length,
       avgTicket,
     }
-  }, [filteredOrders])
+  }, [filteredReportOrders])
 
   // Sales by category
   const salesByCategory = useMemo(() => {
     const categoryTotals: Record<string, number> = {}
 
-    filteredOrders.forEach((order) => {
+    filteredReportOrders.forEach((order) => {
       order.items.forEach((item) => {
         // Find the menu item's category
         const categoryId = categories.find((c) =>
@@ -85,7 +111,7 @@ export default function ReportsPage() {
     })
 
     return Object.entries(categoryTotals).map(([name, value]) => ({ name, value }))
-  }, [filteredOrders, categories])
+  }, [filteredReportOrders, categories])
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
@@ -108,7 +134,7 @@ export default function ReportsPage() {
       const nextDate = new Date(date)
       nextDate.setDate(nextDate.getDate() + 1)
 
-      const dayOrders = filteredOrders.filter((o) => {
+      const dayOrders = filteredReportOrders.filter((o) => {
         const orderDate = new Date(o.createdAt)
         return orderDate >= date && orderDate < nextDate && o.paymentStatus === 'paid'
       })
@@ -121,7 +147,42 @@ export default function ReportsPage() {
     }
 
     return data
-  }, [filteredOrders, dateRange])
+  }, [filteredReportOrders, dateRange])
+
+  const reportButtons = useMemo(() => {
+    const cashSaleCount = filteredOrders.filter((o) => o.paymentStatus === 'paid' && o.paymentMethod === 'cash').length
+    const cardSaleCount = filteredOrders.filter((o) => o.paymentStatus === 'paid' && o.paymentMethod === 'card').length
+    const voidCount = filteredOrders.filter((o) => o.status === 'cancelled' || o.paymentStatus === 'refunded').length
+    const deliveryCount = filteredOrders.filter((o) => (o.tableName || '').toLowerCase().includes('delivery')).length
+    const serviceChargeCount = filteredOrders.filter((o) => o.tax > 0).length
+    const complimentaryCount = filteredOrders.filter((o) => o.total === 0).length
+    const kotAcceptedCount = filteredOrders.filter((o) => ['preparing', 'ready', 'completed'].includes(o.status)).length
+    const kotCanceledCount = filteredOrders.filter((o) => o.status === 'cancelled').length
+
+    return [
+      { value: 'all' as const, label: 'All Reports', count: filteredOrders.length },
+      { value: 'cash-sale' as const, label: 'Cash Sale', count: cashSaleCount },
+      { value: 'card-sale' as const, label: 'Card Sale', count: cardSaleCount },
+      { value: 'kot-accepted' as const, label: 'KOT Accepted', count: kotAcceptedCount },
+      { value: 'kot-canceled' as const, label: 'KOT Canceled', count: kotCanceledCount },
+      { value: 'void-return-cancel' as const, label: 'Void / Return / Cancel', count: voidCount },
+      { value: 'delivery' as const, label: 'Delivery', count: deliveryCount },
+      { value: 'service-charges' as const, label: 'Service Charges', count: serviceChargeCount },
+      { value: 'complimentary' as const, label: 'Complimentary', count: complimentaryCount },
+    ]
+  }, [filteredOrders])
+
+  const reportViewDescriptions: Record<ReportView, string> = {
+    all: 'All orders in the selected date range.',
+    'cash-sale': 'Paid orders collected in cash.',
+    'card-sale': 'Paid orders collected by card.',
+    'kot-accepted': 'Kitchen order tickets that were accepted and moved into preparing, ready, or completed status.',
+    'kot-canceled': 'Kitchen order tickets that were canceled.',
+    'void-return-cancel': 'Orders that were voided, refunded, or cancelled.',
+    delivery: 'Orders tagged as delivery in the table/order label.',
+    'service-charges': 'Orders that include a dine-in service charge.',
+    complimentary: 'Orders with a zero-value total, used here as complimentary orders.',
+  }
 
   const rangeLabel = dateRange === 'today' ? 'today' : dateRange === '7days' ? 'last-7-days' : 'last-30-days'
 
@@ -155,7 +216,7 @@ export default function ReportsPage() {
 
   const handleExportCsv = () => {
     const generatedAt = new Date().toISOString()
-    const orderRows = filteredOrders
+    const orderRows = filteredReportOrders
       .map((order) => {
         const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
         const itemSummary = order.items
@@ -186,7 +247,7 @@ export default function ReportsPage() {
       `Total Sales,${totals.totalSales.toFixed(2)}`,
       `Orders (Paid),${totals.orderCount}`,
       `Average Ticket,${totals.avgTicket.toFixed(2)}`,
-      `Tax Collected,${totals.totalTax.toFixed(2)}`,
+      `Service Charges,${totals.totalTax.toFixed(2)}`,
       `Cash Sales,${totals.cashSales.toFixed(2)}`,
       `Card Sales,${totals.cardSales.toFixed(2)}`,
       '',
@@ -199,7 +260,7 @@ export default function ReportsPage() {
         'Order Status',
         'Items Count',
         'Subtotal',
-        'Tax',
+        'Service Charge',
         'Total',
         'Created At',
         'Items',
@@ -219,14 +280,14 @@ export default function ReportsPage() {
       ['Total Sales', totals.totalSales.toFixed(2)],
       ['Orders (Paid)', String(totals.orderCount)],
       ['Average Ticket', totals.avgTicket.toFixed(2)],
-      ['Tax Collected', totals.totalTax.toFixed(2)],
+      ['Service Charges', totals.totalTax.toFixed(2)],
       ['Cash Sales', totals.cashSales.toFixed(2)],
       ['Card Sales', totals.cardSales.toFixed(2)],
     ]
       .map(([label, value]) => `<tr><td><b>${sanitizeHtml(label)}</b></td><td>${sanitizeHtml(value)}</td></tr>`)
       .join('')
 
-    const orderRows = filteredOrders
+    const orderRows = filteredReportOrders
       .map((order) => {
         const items = order.items.map((item) => `${item.quantity}x ${item.name}`).join(' | ')
         return `<tr>
@@ -264,7 +325,7 @@ export default function ReportsPage() {
       <thead>
         <tr>
           <th>Order #</th><th>Payment Status</th><th>Payment Method</th><th>Table</th><th>Order Status</th>
-          <th>Items Count</th><th>Subtotal</th><th>Tax</th><th>Total</th><th>Created At</th><th>Items</th>
+          <th>Items Count</th><th>Subtotal</th><th>Service Charge</th><th>Total</th><th>Created At</th><th>Items</th>
         </tr>
       </thead>
       <tbody>${orderRows}</tbody>
@@ -287,7 +348,7 @@ export default function ReportsPage() {
       `Average Ticket: ${settings.currencySymbol}${totals.avgTicket.toFixed(2)}`,
       '',
       'Order # | Method | Table | Status | Items | Total',
-      ...filteredOrders.map(
+      ...filteredReportOrders.map(
         (order) =>
           `${order.orderNumber} | ${order.paymentMethod || 'pending'} | ${order.tableName || 'Takeaway'} | ${order.paymentStatus} | ${order.items.reduce((sum, item) => sum + item.quantity, 0)} | ${settings.currencySymbol}${order.total.toFixed(2)}`
       ),
@@ -376,6 +437,31 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ListFilter className="h-5 w-5" />
+            Report Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {reportButtons.map((button) => (
+              <Button
+                key={button.value}
+                variant={reportView === button.value ? 'default' : 'outline'}
+                className="gap-2"
+                onClick={() => setReportView(button.value)}
+              >
+                {button.label}
+                <Badge variant={reportView === button.value ? 'secondary' : 'outline'}>{button.count}</Badge>
+              </Button>
+            ))}
+          </div>
+          <p className="text-sm text-muted-foreground">{reportViewDescriptions[reportView]}</p>
+        </CardContent>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -415,7 +501,7 @@ export default function ReportsPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
-              Tax Collected
+              Service Charges
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -548,6 +634,44 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Filtered Orders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredReportOrders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No matching records for this report.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="min-w-[980px] w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="p-3 text-left">Order #</th>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Source</th>
+                    <th className="p-3 text-left">Status</th>
+                    <th className="p-3 text-left">Payment</th>
+                    <th className="p-3 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReportOrders.map((order) => (
+                    <tr key={order.id} className="border-t">
+                      <td className="p-3 font-medium">#{order.orderNumber}</td>
+                      <td className="p-3">{new Date(order.createdAt).toLocaleString()}</td>
+                      <td className="p-3">{order.tableName || 'Takeaway'}</td>
+                      <td className="p-3 capitalize">{order.status}</td>
+                      <td className="p-3 capitalize">{order.paymentMethod || order.paymentStatus}</td>
+                      <td className="p-3 text-right font-semibold">{settings.currencySymbol}{order.total.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

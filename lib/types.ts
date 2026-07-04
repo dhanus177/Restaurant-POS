@@ -61,6 +61,7 @@ export interface MenuItem {
   image?: string
   modifierGroups?: ModifierGroup[]
   isAvailable: boolean
+  applyServiceCharge?: boolean
 }
 
 // Orders
@@ -82,6 +83,7 @@ export interface OrderItem {
   price: number
   modifiers: SelectedModifier[]
   notes?: string
+  serviceChargeApplicable?: boolean
 }
 
 export interface Order {
@@ -125,6 +127,51 @@ export interface Supplier {
   email: string
   phone: string
   inventoryItemCount?: number
+  totalPurchases?: number
+  totalPayments?: number
+  balanceDue?: number
+}
+
+export type SupplierLedgerEntryType = 'purchase' | 'payment' | 'grn' | 'return'
+
+export interface SupplierLedgerEntry {
+  id: string
+  supplierId: string
+  type: SupplierLedgerEntryType
+  reference?: string | null
+  inventoryItemId?: string | null
+  quantity?: number | null
+  amount: number
+  notes?: string | null
+  createdAt: string
+}
+
+export interface CashDrawer {
+  id: string
+  openingBalance: number
+  notes?: string | null
+  openedAt?: string
+  updatedAt?: string
+}
+
+export interface CashDrawerExpense {
+  id: string
+  drawerId: string
+  amount: number
+  reason: string
+  createdAt: string
+  createdBy: string
+}
+
+export interface CashDrawerReport {
+  id: string
+  openingBalance: number
+  expectedBalance: number
+  countedCash: number
+  variance: number
+  notes?: string | null
+  closedAt: string
+  closedBy: string
 }
 
 export interface InventoryItem {

@@ -22,6 +22,7 @@ import Image from 'next/image'
 import { useTheme } from 'next-themes'
 
 const currencies = [
+  { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'EUR', symbol: '\u20AC', name: 'Euro' },
   { code: 'GBP', symbol: '\u00A3', name: 'British Pound' },
@@ -255,22 +256,22 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Tax & Currency */}
+      {/* Service Charge & Currency */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Tax & Currency
+            Service Charge & Currency
           </CardTitle>
           <CardDescription>
-            Configure tax rates and currency settings
+            Configure service charge rates and currency settings
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <fieldset disabled={!canManageRestaurant} className="space-y-4 disabled:pointer-events-none disabled:opacity-70">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="taxRate">Tax Rate (%)</Label>
+              <Label htmlFor="taxRate">Service Charge Rate (%)</Label>
               <Input
                 id="taxRate"
                 type="number"
