@@ -431,6 +431,7 @@ export const mockSettings: Settings = {
   currencySymbol: 'Rs',
   receiptFooter: 'Thank you for dining with us!',
   logo: '',
+  requireCustomerBeforeOrder: true,
 }
 
 export const mockProductRecipes = [

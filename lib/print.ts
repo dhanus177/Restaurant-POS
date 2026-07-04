@@ -60,6 +60,7 @@ export function formatDateTime(date: string | Date): string {
 
 export function generateReceiptHTML(order: Order, settings: Settings): string {
   const billCode = generateBillCode(order.orderNumber, order.createdAt)
+  const hasLogo = typeof settings.logo === 'string' && settings.logo.trim().length > 0
   const itemsHTML = order.items
     .map(
       (item) => `
@@ -83,6 +84,8 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
       <style>
         body { font-family: 'Courier New', monospace; font-size: 12px; width: 280px; margin: 0 auto; padding: 20px; }
         .header { text-align: center; margin-bottom: 20px; }
+        .logo-wrap { display: flex; justify-content: center; margin-bottom: 8px; }
+        .logo-wrap img { max-width: 90px; max-height: 90px; object-fit: contain; }
         .header h1 { margin: 0; font-size: 18px; }
         .header p { margin: 5px 0; color: #666; }
         table { width: 100%; border-collapse: collapse; }
@@ -94,6 +97,7 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
     </head>
     <body>
       <div class="header">
+        ${hasLogo ? `<div class="logo-wrap"><img src="${settings.logo}" alt="${settings.restaurantName} logo" /></div>` : ''}
         <h1>${settings.restaurantName}</h1>
         <p>${settings.address}</p>
         <p>${settings.phone}</p>

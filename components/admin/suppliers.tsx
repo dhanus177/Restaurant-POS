@@ -126,6 +126,28 @@ export function SuppliersManager() {
     })
   }, [suppliers, search])
 
+  const payableSummary = useMemo(() => {
+    return filteredSuppliers.reduce(
+      (acc, supplier) => {
+        acc.totalPayable += supplier.balanceDue ?? 0
+        acc.aging0to30 += supplier.aging0to30 ?? 0
+        acc.aging31to60 += supplier.aging31to60 ?? 0
+        acc.aging61to90 += supplier.aging61to90 ?? 0
+        acc.aging90plus += supplier.aging90plus ?? 0
+        acc.overdue += supplier.overdueAmount ?? 0
+        return acc
+      },
+      {
+        totalPayable: 0,
+        aging0to30: 0,
+        aging31to60: 0,
+        aging61to90: 0,
+        aging90plus: 0,
+        overdue: 0,
+      }
+    )
+  }, [filteredSuppliers])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -491,6 +513,45 @@ export function SuppliersManager() {
         className="max-w-xl"
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Total payable</p>
+            <p className="mt-2 text-lg font-bold text-foreground">{settings.currencySymbol}{payableSummary.totalPayable.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">0-30 days</p>
+            <p className="mt-2 text-lg font-bold text-foreground">{settings.currencySymbol}{payableSummary.aging0to30.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">31-60 days</p>
+            <p className="mt-2 text-lg font-bold text-foreground">{settings.currencySymbol}{payableSummary.aging31to60.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">61-90 days</p>
+            <p className="mt-2 text-lg font-bold text-amber-600 dark:text-amber-400">{settings.currencySymbol}{payableSummary.aging61to90.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">90+ days</p>
+            <p className="mt-2 text-lg font-bold text-red-600 dark:text-red-400">{settings.currencySymbol}{payableSummary.aging90plus.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Overdue (61+)</p>
+            <p className="mt-2 text-lg font-bold text-red-600 dark:text-red-400">{settings.currencySymbol}{payableSummary.overdue.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Supplier List ({filteredSuppliers.length})</CardTitle>
@@ -542,6 +603,7 @@ export function SuppliersManager() {
                           <div>Purchases: <span className="font-medium text-foreground">{(supplier.totalPurchases ?? 0).toFixed(2)}</span></div>
                           <div>Payments: <span className="font-medium text-foreground">{(supplier.totalPayments ?? 0).toFixed(2)}</span></div>
                           <div>Due: <span className="font-medium text-foreground">{(supplier.balanceDue ?? 0).toFixed(2)}</span></div>
+                          <div className="pt-1">Aging: 0-30 {(supplier.aging0to30 ?? 0).toFixed(2)} · 31-60 {(supplier.aging31to60 ?? 0).toFixed(2)} · 61-90 {(supplier.aging61to90 ?? 0).toFixed(2)} · 90+ {(supplier.aging90plus ?? 0).toFixed(2)}</div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -650,7 +712,7 @@ export function SuppliersManager() {
       </Dialog>
 
       <Dialog open={Boolean(ledgerSupplier)} onOpenChange={(open) => !open && setLedgerSupplier(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="h-[92vh] w-[98vw] max-w-[98vw] sm:max-w-[98vw] 2xl:max-w-[1500px] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{ledgerSupplier?.name ?? 'Supplier'} — Purchases, GRN, Returns & Payments</DialogTitle>
             <DialogDescription>
@@ -658,8 +720,8 @@ export function SuppliersManager() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
-            <Card>
+          <div className="grid gap-4 2xl:grid-cols-[380px_minmax(620px,1fr)]">
+            <Card className="min-w-0">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Add Supplier Entry</CardTitle>
               </CardHeader>
@@ -769,11 +831,11 @@ export function SuppliersManager() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="min-w-0">
               <CardHeader className="pb-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-lg">Supplier Ledger</CardTitle>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                     <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintStatement}>
                       <Printer className="h-4 w-4" />
                       Print Statement
@@ -782,13 +844,14 @@ export function SuppliersManager() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_auto]">
+                <div className="mb-4 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                   <div className="flex flex-wrap gap-2">
                     {(['all', 'purchase', 'grn', 'return', 'payment'] as const).map((filter) => (
                       <Button
                         key={filter}
                         variant={ledgerFilter === filter ? 'default' : 'outline'}
                         size="sm"
+                        className="min-w-[92px]"
                         onClick={() => setLedgerFilter(filter)}
                       >
                         {filter === 'all' ? 'All' : filter === 'grn' ? 'GRN' : filter[0].toUpperCase() + filter.slice(1)}
@@ -796,7 +859,7 @@ export function SuppliersManager() {
                     ))}
                   </div>
                   <select
-                    className="h-9 rounded-md border bg-background px-3 text-sm"
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm lg:w-[170px]"
                     value={ledgerDateRange}
                     onChange={(e) => setLedgerDateRange(e.target.value as LedgerDateRange)}
                   >
@@ -807,10 +870,10 @@ export function SuppliersManager() {
                   </select>
                 </div>
 
-                <div className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-sm">
+                <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4 text-sm">
                   {agingSummary.map((bucket) => (
                     <div key={bucket.label} className="rounded-lg border bg-background p-3">
-                      <div className="text-muted-foreground">{bucket.label}</div>
+                      <div className="text-muted-foreground text-xs uppercase tracking-[0.15em]">{bucket.label}</div>
                       <div className="font-semibold text-foreground">{settings.currencySymbol}{bucket.amount.toFixed(2)}</div>
                     </div>
                   ))}

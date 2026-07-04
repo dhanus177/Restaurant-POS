@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/api'
 import { usePOSStore } from '@/lib/store'
+import type { BackupSchedule, BackupSnapshot } from '@/lib/types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [isRunningScheduledBackup, setIsRunningScheduledBackup] = useState(false)
+  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false)
+  const [backupSchedule, setBackupSchedule] = useState<BackupSchedule | null>(null)
+  const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshot[]>([])
   const canManageRestaurant = currentUser?.role === 'super-admin'
 
   useEffect(() => {
@@ -48,6 +54,33 @@ export default function SettingsPage() {
   useEffect(() => {
     setFormData(settings)
   }, [settings])
+
+  useEffect(() => {
+    if (!mounted || !canManageRestaurant) return
+    void loadBackupAutomation()
+  }, [mounted, canManageRestaurant])
+
+  const loadBackupAutomation = async () => {
+    try {
+      const [scheduleRes, snapshotsRes] = await Promise.all([
+        apiFetch('/api/backup/schedule'),
+        apiFetch('/api/backup/snapshots'),
+      ])
+
+      if (scheduleRes.ok) {
+        const schedule = (await scheduleRes.json()) as BackupSchedule
+        setBackupSchedule(schedule)
+      }
+
+      if (snapshotsRes.ok) {
+        const snapshots = (await snapshotsRes.json()) as BackupSnapshot[]
+        setBackupSnapshots(Array.isArray(snapshots) ? snapshots : [])
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to load backup automation settings')
+    }
+  }
 
   const handleSave = async () => {
     if (!canManageRestaurant) {
@@ -102,12 +135,12 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `pos-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `pos-full-db-backup-${new Date().toISOString().slice(0, 10)}.json`
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      toast.success('Database backup downloaded')
+      toast.success('Full database backup downloaded')
     } catch (error) {
       console.error(error)
       toast.error('Failed to create backup')
@@ -142,6 +175,77 @@ export default function SettingsPage() {
       toast.error('Failed to restore backup')
     } finally {
       setIsRestoring(false)
+    }
+  }
+
+  const handleSaveBackupSchedule = async () => {
+    if (!canManageRestaurant || !backupSchedule) return
+
+    setIsSavingSchedule(true)
+    try {
+      const res = await apiFetch('/api/backup/schedule', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: backupSchedule.enabled,
+          frequencyHours: backupSchedule.frequencyHours,
+          retentionCount: backupSchedule.retentionCount,
+          verifyChecksum: backupSchedule.verifyChecksum,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Failed to save backup schedule')
+      const saved = (await res.json()) as BackupSchedule
+      setBackupSchedule(saved)
+      toast.success('Backup schedule updated')
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to save backup schedule')
+    } finally {
+      setIsSavingSchedule(false)
+    }
+  }
+
+  const handleRunScheduledBackupNow = async () => {
+    if (!canManageRestaurant) return
+
+    setIsRunningScheduledBackup(true)
+    try {
+      const res = await apiFetch('/api/backup/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      })
+      if (!res.ok) throw new Error('Failed to run scheduled backup')
+
+      const data = await res.json()
+      if (data?.schedule) {
+        setBackupSchedule(data.schedule as BackupSchedule)
+      }
+      toast.success(data?.snapshotId ? 'Scheduled backup snapshot completed' : 'Backup schedule checked')
+      await loadBackupAutomation()
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to run scheduled backup')
+    } finally {
+      setIsRunningScheduledBackup(false)
+    }
+  }
+
+  const handleCreateSnapshot = async () => {
+    if (!canManageRestaurant) return
+
+    setIsCreatingSnapshot(true)
+    try {
+      const res = await apiFetch('/api/backup/snapshots', { method: 'POST' })
+      if (!res.ok) throw new Error('Failed to create verified snapshot')
+      toast.success('Verified backup snapshot created')
+      await loadBackupAutomation()
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to create backup snapshot')
+    } finally {
+      setIsCreatingSnapshot(false)
     }
   }
 
@@ -297,7 +401,30 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="requireCustomerBeforeOrder">Customer required before order</Label>
+              <Select
+                value={formData.requireCustomerBeforeOrder === true ? 'enabled' : 'disabled'}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    requireCustomerBeforeOrder: value === 'enabled',
+                  })
+                }
+              >
+                <SelectTrigger id="requireCustomerBeforeOrder">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enabled">Enabled</SelectItem>
+                  <SelectItem value="disabled">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            When enabled, staff must select or create a customer before starting a new order in POS.
+          </p>
           </fieldset>
         </CardContent>
       </Card>
@@ -364,7 +491,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Download className="h-5 w-5" />
-            Database Backup & Restore
+            Full DB Backup & Restore
           </CardTitle>
           <CardDescription>
             Download a full JSON backup, or restore from a previously exported backup file.
@@ -372,7 +499,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <Button onClick={() => void handleBackup()} variant="outline" className="w-full sm:w-auto" disabled={!canManageRestaurant || isBackingUp || isRestoring}>
-            {isBackingUp ? 'Creating backup...' : 'Download Backup'}
+            {isBackingUp ? 'Creating full backup...' : 'Download Full DB Backup'}
           </Button>
 
           <div>
@@ -390,6 +517,112 @@ export default function SettingsPage() {
             />
             <p className="mt-2 text-xs text-muted-foreground">Warning: restore replaces current operational data.</p>
           </div>
+
+          {canManageRestaurant && backupSchedule && (
+            <div className="space-y-4 rounded-lg border p-4">
+              <div>
+                <h3 className="text-sm font-semibold">Scheduled + Verified Backups</h3>
+                <p className="text-xs text-muted-foreground">Configure automatic backup snapshots with checksum verification and retention.</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="backup-enabled">Automation</Label>
+                  <Select
+                    value={backupSchedule.enabled ? 'enabled' : 'disabled'}
+                    onValueChange={(value) => setBackupSchedule((current) => (current ? { ...current, enabled: value === 'enabled' } : current))}
+                  >
+                    <SelectTrigger id="backup-enabled">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enabled">Enabled</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="backup-verify">Checksum Verify</Label>
+                  <Select
+                    value={backupSchedule.verifyChecksum ? 'yes' : 'no'}
+                    onValueChange={(value) => setBackupSchedule((current) => (current ? { ...current, verifyChecksum: value === 'yes' } : current))}
+                  >
+                    <SelectTrigger id="backup-verify">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Enabled</SelectItem>
+                      <SelectItem value="no">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="backup-frequency">Frequency (hours)</Label>
+                  <Input
+                    id="backup-frequency"
+                    type="number"
+                    min={1}
+                    max={336}
+                    value={backupSchedule.frequencyHours}
+                    onChange={(e) => setBackupSchedule((current) => (current ? { ...current, frequencyHours: Number(e.target.value) || 1 } : current))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="backup-retention">Retention (snapshots)</Label>
+                  <Input
+                    id="backup-retention"
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={backupSchedule.retentionCount}
+                    onChange={(e) => setBackupSchedule((current) => (current ? { ...current, retentionCount: Number(e.target.value) || 1 } : current))}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
+                <p>Last run: {backupSchedule.lastRunAt ? new Date(backupSchedule.lastRunAt).toLocaleString() : 'Never'}</p>
+                <p>Next run: {backupSchedule.nextRunAt ? new Date(backupSchedule.nextRunAt).toLocaleString() : 'Not scheduled'}</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => void handleSaveBackupSchedule()} disabled={isSavingSchedule || isBackingUp || isRestoring}>
+                  {isSavingSchedule ? 'Saving schedule...' : 'Save Schedule'}
+                </Button>
+                <Button variant="outline" onClick={() => void handleRunScheduledBackupNow()} disabled={isRunningScheduledBackup || isBackingUp || isRestoring}>
+                  {isRunningScheduledBackup ? 'Running backup...' : 'Run Scheduled Backup Now'}
+                </Button>
+                <Button variant="outline" onClick={() => void handleCreateSnapshot()} disabled={isCreatingSnapshot || isBackingUp || isRestoring}>
+                  {isCreatingSnapshot ? 'Creating snapshot...' : 'Create Verified Snapshot'}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Recent backup snapshots</p>
+                {backupSnapshots.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No snapshots yet.</p>
+                ) : (
+                  <div className="max-h-48 space-y-2 overflow-auto rounded-md border p-2">
+                    {backupSnapshots.slice(0, 10).map((snapshot) => (
+                      <div key={snapshot.id} className="rounded-md border bg-background p-2 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{snapshot.trigger.toUpperCase()}</span>
+                          <span className={snapshot.verified ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}>
+                            {snapshot.verified ? 'Verified' : 'Verification Failed'}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-muted-foreground">{new Date(snapshot.createdAt).toLocaleString()}</div>
+                        <div className="mt-1 font-mono text-[10px] text-muted-foreground">{snapshot.checksum.slice(0, 20)}…</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

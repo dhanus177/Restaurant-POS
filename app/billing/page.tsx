@@ -142,7 +142,7 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
+    <div className="flex min-h-dvh flex-col overflow-x-hidden bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
       <Header title="Billing Counter" />
 
       <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
@@ -159,8 +159,8 @@ export default function BillingPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-          <Card className="border-amber-200 shadow-sm dark:border-amber-900/40">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+          <Card className="min-w-0 border-amber-200 shadow-sm dark:border-amber-900/40">
             <CardHeader className="bg-amber-50/70 dark:bg-card/70">
               <CardTitle className="flex items-center gap-2">
                 <ReceiptText className="h-5 w-5 text-amber-700 dark:text-amber-300" />
@@ -174,27 +174,27 @@ export default function BillingPage() {
               </div>
 
               <div className="rounded-xl bg-amber-50 p-4 dark:bg-muted/30">
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
                   <span className="flex items-center gap-2"><Users className="h-4 w-4" /> Seating</span>
-                  <span>{selectedTable ? selectedTable.name : 'Takeaway'}</span>
+                  <span className="text-right">{selectedTable ? selectedTable.name : 'Takeaway'}</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
                   <span>Customer count</span>
-                  <span>{currentCustomerCount} pax</span>
+                  <span className="text-right">{currentCustomerCount} pax</span>
                 </div>
-                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
                   <span>Customer</span>
-                  <span>{selectedCustomer?.name ?? 'Walk-in'}</span>
+                  <span className="max-w-[55%] break-words text-right">{selectedCustomer?.name ?? 'Walk-in'}</span>
                 </div>
                 {selectedCustomer?.phone && (
-                  <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                  <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
                     <span>Phone</span>
-                    <span>{selectedCustomer.phone}</span>
+                    <span className="text-right">{selectedCustomer.phone}</span>
                   </div>
                 )}
-                <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
                   <span>Order source</span>
-                  <span>Counter</span>
+                  <span className="text-right">Counter</span>
                 </div>
                 <Separator className="my-3" />
                 <div className="flex items-end justify-between">
@@ -254,7 +254,7 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-amber-200 shadow-sm dark:border-amber-900/40">
+          <Card className="min-w-0 border-amber-200 shadow-sm dark:border-amber-900/40">
             <CardHeader className="bg-amber-50/70 dark:bg-card/70">
               <CardTitle className="flex items-center gap-2">
                 <ScanBarcode className="h-5 w-5 text-amber-700 dark:text-amber-300" />
@@ -264,7 +264,7 @@ export default function BillingPage() {
             <CardContent className="space-y-4 p-6">
               <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-background p-4 text-center shadow-inner dark:bg-card">
                 <p className="text-xs text-muted-foreground">Bill Code</p>
-                <p className="font-mono text-lg font-semibold tracking-widest">{billCode}</p>
+                <p className="break-all font-mono text-base font-semibold tracking-[0.2em] sm:text-lg">{billCode}</p>
                 <div className="mt-4 overflow-x-auto rounded-lg bg-background p-2 dark:bg-card" dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
               </div>
               <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
@@ -274,14 +274,14 @@ export default function BillingPage() {
           </Card>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
-          <Button variant="outline" size="lg" className="w-full sm:w-auto" onClick={() => router.push('/pos')}>Back to POS</Button>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button variant="secondary" size="lg" className="w-full gap-2 sm:w-auto" onClick={handlePrintBillingSlip} disabled={cart.length === 0 || isSubmitting}>
+        <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <Button variant="outline" size="lg" className="w-full xl:w-auto" onClick={() => router.push('/pos')}>Back to POS</Button>
+          <div className="flex flex-col gap-3 lg:flex-row xl:justify-end">
+            <Button variant="secondary" size="lg" className="w-full gap-2 lg:w-auto" onClick={handlePrintBillingSlip} disabled={cart.length === 0 || isSubmitting}>
               <Printer className="h-4 w-4" />
               Print Billing Slip
             </Button>
-            <Button size="lg" className="w-full sm:min-w-64" onClick={handleSendToPayCounter} disabled={isSubmitting || cart.length === 0}>
+            <Button size="lg" className="w-full lg:min-w-64 xl:min-w-72" onClick={handleSendToPayCounter} disabled={isSubmitting || cart.length === 0}>
               {isSubmitting ? 'Sending...' : 'Send Bill to Pay Counter'}
             </Button>
           </div>

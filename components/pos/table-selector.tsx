@@ -12,9 +12,10 @@ import { Label } from '@/components/ui/label'
 interface TableSelectorProps {
   open: boolean
   onClose: () => void
+  onOrderModeChange?: (mode: 'dine-in' | 'takeaway') => void
 }
 
-export function TableSelector({ open, onClose }: TableSelectorProps) {
+export function TableSelector({ open, onClose, onOrderModeChange }: TableSelectorProps) {
   const { tables, selectedTable, setSelectedTable, currentCustomerCount, setCurrentCustomerCount } = usePOSStore()
 
   const fitTables = tables.filter((t) => t.seats >= currentCustomerCount)
@@ -22,10 +23,12 @@ export function TableSelector({ open, onClose }: TableSelectorProps) {
   const handleSelectTable = (tableId: string | null) => {
     if (tableId === null) {
       setSelectedTable(null)
+      onOrderModeChange?.('takeaway')
     } else {
       const table = tables.find((t) => t.id === tableId)
       if (table && table.status === 'available') {
         setSelectedTable(table)
+        onOrderModeChange?.('dine-in')
       }
     }
     onClose()

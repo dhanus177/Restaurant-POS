@@ -6,7 +6,7 @@ type GuardResult<T> =
   | { ok: true; value: T }
   | { ok: false; response: NextResponse }
 
-type ActorUser = {
+export type ActorUser = {
   id: string
   role: string
   name: string

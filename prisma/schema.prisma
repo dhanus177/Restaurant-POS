@@ -193,6 +193,7 @@ model Settings {
   currencySymbol String
   receiptFooter  String
   logo           String?
+  requireCustomerBeforeOrder Boolean @default(false)
 }
 
 model CashDrawer {
@@ -248,4 +249,69 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  resource    String
+  resourceId  String?
+  details     Json?
+  actorId     String?
+  actorName   String?
+  actorRole   String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([resource])
+  @@index([actorRole])
+}
+
+model BackupSchedule {
+  id             String   @id @default("singleton")
+  enabled        Boolean  @default(false)
+  frequencyHours Int      @default(24)
+  retentionCount Int      @default(14)
+  verifyChecksum Boolean  @default(true)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  updatedAt      DateTime @updatedAt
+}
+
+model BackupSnapshot {
+  id         String   @id @default(cuid())
+  trigger    String
+  checksum   String
+  verified   Boolean  @default(true)
+  sizeBytes  Int
+  exportedAt DateTime
+  createdBy  String?
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([trigger])
+}
+
+model Shift {
+  id           String   @id @default(cuid())
+  openedAt     DateTime @default(now())
+  openedBy     String
+  openingFloat Float
+  status       String   @default("open")
+  notes        String?
+  closedAt     DateTime?
+  closedBy     String?
+  expectedCash Float?
+  countedCash  Float?
+  variance     Float?
+  denominations Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([status])
+  @@index([openedAt])
+  @@index([closedAt])
 }

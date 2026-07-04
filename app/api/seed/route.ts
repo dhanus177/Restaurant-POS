@@ -38,6 +38,9 @@ export async function POST(req: Request) {
         prisma.restaurantTable.deleteMany(),
         prisma.inventoryItem.deleteMany(),
         prisma.supplier.deleteMany(),
+        prisma.shift.deleteMany(),
+        prisma.backupSnapshot.deleteMany(),
+        prisma.backupSchedule.deleteMany(),
         prisma.cashDrawer.deleteMany(),
         prisma.cashDrawerExpense.deleteMany(),
         prisma.cashDrawerReport.deleteMany(),
@@ -143,6 +146,18 @@ export async function POST(req: Request) {
         openingBalance: 0,
         notes: 'Initial drawer balance',
         openedAt: new Date(),
+      },
+    })
+
+    await prisma.backupSchedule.upsert({
+      where: { id: 'singleton' },
+      update: {},
+      create: {
+        id: 'singleton',
+        enabled: false,
+        frequencyHours: 24,
+        retentionCount: 14,
+        verifyChecksum: true,
       },
     })
 

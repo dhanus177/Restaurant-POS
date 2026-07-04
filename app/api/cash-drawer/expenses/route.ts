@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveLicense, requireRole } from '@/lib/server-guards'
+import { writeAuditLog } from '@/lib/audit-log'
 
 function toAppExpense(expense: {
   id: string
@@ -58,6 +59,18 @@ export async function POST(req: Request) {
       amount,
       reason,
       createdBy: actor.value.id,
+    },
+  })
+
+  await writeAuditLog({
+    req,
+    actor: actor.value,
+    action: 'cash_drawer.expense',
+    resource: 'cash_drawer_expense',
+    resourceId: expense.id,
+    details: {
+      amount,
+      reason,
     },
   })
 

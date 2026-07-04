@@ -22,10 +22,11 @@ import { toast } from 'sonner'
 interface CartProps {
   onCreateBill: () => void
   onSelectTable: () => void
+  orderMode?: 'dine-in' | 'takeaway'
   className?: string
 }
 
-export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
+export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', className }: CartProps) {
   const {
     cart,
     selectedTable,
@@ -108,6 +109,21 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
     }
   }
 
+  const handleCreateBillClick = () => {
+    if (settings.requireCustomerBeforeOrder === true && !selectedCustomer) {
+      toast.error('Before billing: Step 1 is customer details.')
+      return
+    }
+
+    if (!selectedTable && orderMode !== 'takeaway') {
+      toast.error('Before billing: Step 2 is table selection.')
+      onSelectTable()
+      return
+    }
+
+    onCreateBill()
+  }
+
   return (
     <div className={cn('flex h-full flex-col bg-card border-l border-border', className)}>
       {/* Header */}
@@ -121,16 +137,10 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
             </Button>
           )}
         </div>
-        <Button
-          variant={selectedTable ? 'secondary' : 'outline'}
-          size="sm"
-          className="mt-2 w-full justify-start"
-          onClick={onSelectTable}
-        >
-          {selectedTable ? `Table: ${selectedTable.name}` : 'Select Table (Optional)'}
-        </Button>
-
-        <div className="mt-2 space-y-1">
+        <div className="mt-2 space-y-1 rounded-md border p-2">
+          <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+            {settings.requireCustomerBeforeOrder === true ? 'Step 1 — Customer details' : 'Customer details (optional)'}
+          </p>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Customer</span>
             <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
@@ -227,6 +237,18 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
           {selectedCustomer?.notes && (
             <p className="text-xs text-muted-foreground">Note: {selectedCustomer.notes}</p>
           )}
+        </div>
+
+        <div className="mt-2 rounded-md border p-2">
+          <p className="mb-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Step 2 — Table selection</p>
+          <Button
+            variant={selectedTable ? 'secondary' : 'outline'}
+            size="sm"
+            className="w-full justify-start"
+            onClick={onSelectTable}
+          >
+            {selectedTable ? `Table: ${selectedTable.name}` : orderMode === 'takeaway' ? 'Takeaway' : 'Select Table'}
+          </Button>
         </div>
       </div>
 
@@ -347,7 +369,7 @@ export function Cart({ onCreateBill, onSelectTable, className }: CartProps) {
           size="lg"
           className="w-full h-14 text-lg font-semibold"
           disabled={cart.length === 0}
-          onClick={onCreateBill}
+          onClick={handleCreateBillClick}
         >
           Create Bill {settings.currencySymbol}{total.toFixed(2)}
         </Button>

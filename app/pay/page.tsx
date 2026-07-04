@@ -4,15 +4,23 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/shared/header'
 import { usePOSStore } from '@/lib/store'
+import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { PaymentModal } from '@/components/pos/payment-modal'
 import { generateBillCode } from '@/lib/print'
-import type { Order } from '@/lib/types'
+import type { Order, Shift } from '@/lib/types'
 import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
+
+const LKR_DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const
+
+const initialDenominationState = LKR_DENOMINATIONS.reduce<Record<string, string>>((acc, value) => {
+  acc[String(value)] = ''
+  return acc
+}, {})
 
 export default function PayPage() {
   const router = useRouter()
@@ -25,11 +33,11 @@ export default function PayPage() {
     cashDrawerReports,
     updateCashDrawer,
     addCashDrawerExpense,
-    createCashDrawerReport,
     getCashDrawerBalance,
     updateOrderStatus,
     updateOrderPayment,
     updateTableStatus,
+    loadFromDB,
   } = usePOSStore()
   const [mounted, setMounted] = useState(false)
   const [query, setQuery] = useState('')
@@ -41,6 +49,8 @@ export default function PayPage() {
   const [cashOutReason, setCashOutReason] = useState('')
   const [drawerNotes, setDrawerNotes] = useState('')
   const [closeoutNotes, setCloseoutNotes] = useState('')
+  const [currentShift, setCurrentShift] = useState<Shift | null>(null)
+  const [denominationCounts, setDenominationCounts] = useState<Record<string, string>>(initialDenominationState)
   const [isSavingDrawer, setIsSavingDrawer] = useState(false)
   const [isSavingCashOut, setIsSavingCashOut] = useState(false)
   const [isClosingDrawer, setIsClosingDrawer] = useState(false)
@@ -56,6 +66,11 @@ export default function PayPage() {
     setOpeningBalanceInput(String(cashDrawer?.openingBalance ?? 0))
     setDrawerNotes(cashDrawer?.notes ?? '')
   }, [cashDrawer])
+
+  useEffect(() => {
+    if (!mounted || !currentUser) return
+    void loadCurrentShift()
+  }, [mounted, currentUser])
 
   useEffect(() => {
     if (mounted && !currentUser) {
@@ -94,9 +109,32 @@ export default function PayPage() {
 
   const drawerBalance = getCashDrawerBalance()
 
+  const denominationTotal = useMemo(() => {
+    return LKR_DENOMINATIONS.reduce((sum, denomination) => {
+      const count = Number(denominationCounts[String(denomination)] || 0)
+      return sum + (Number.isFinite(count) ? count : 0) * denomination
+    }, 0)
+  }, [denominationCounts])
+
   useEffect(() => {
+    if (denominationTotal > 0) {
+      setCountedCashInput(denominationTotal.toFixed(2))
+      return
+    }
+
     setCountedCashInput(drawerBalance.currentBalance.toFixed(2))
-  }, [drawerBalance.currentBalance])
+  }, [drawerBalance.currentBalance, denominationTotal])
+
+  const loadCurrentShift = async () => {
+    try {
+      const res = await apiFetch('/api/shifts/current')
+      if (!res.ok) return
+      const shift = (await res.json()) as Shift | null
+      setCurrentShift(shift)
+    } catch (error) {
+      console.error('Failed to load current shift', error)
+    }
+  }
 
   const handleSaveCashDrawer = async () => {
     if (!canManageDrawer) {
@@ -117,6 +155,25 @@ export default function PayPage() {
         notes: drawerNotes.trim() || null,
         openedAt: new Date().toISOString(),
       })
+
+      if (!currentShift) {
+        const shiftRes = await apiFetch('/api/shifts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            openingFloat: openingBalance,
+            notes: drawerNotes.trim() || null,
+          }),
+        })
+
+        if (shiftRes.ok) {
+          const openedShift = (await shiftRes.json()) as Shift
+          setCurrentShift(openedShift)
+          toast.success('Cash drawer balance saved and shift opened')
+          return
+        }
+      }
+
       toast.success('Cash drawer balance saved')
     } finally {
       setIsSavingDrawer(false)
@@ -178,20 +235,37 @@ export default function PayPage() {
     const expectedBalance = drawerBalance.currentBalance
     const variance = countedCash - expectedBalance
 
+    if (!currentShift) {
+      toast.error('No open shift found. Open a shift before closing the drawer.')
+      return
+    }
+
     setIsClosingDrawer(true)
     try {
-      const report = await createCashDrawerReport({
-        openingBalance: drawerBalance.openingBalance,
-        expectedBalance,
-        countedCash,
-        variance,
-        notes: closeoutNotes.trim() || drawerNotes.trim() || null,
-        closedBy: currentUser?.id || 'unknown',
+      const closeRes = await apiFetch(`/api/shifts/${currentShift.id}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedCash: expectedBalance,
+          countedCash,
+          variance,
+          denominations: Object.fromEntries(
+            LKR_DENOMINATIONS.map((denomination) => [
+              String(denomination),
+              Number(denominationCounts[String(denomination)] || 0),
+            ])
+          ),
+          notes: closeoutNotes.trim() || drawerNotes.trim() || null,
+        }),
       })
 
-      if (!report) {
-        throw new Error('Failed to save cash drawer report')
+      if (!closeRes.ok) {
+        throw new Error('Failed to close shift and save close-out report')
       }
+
+      setCurrentShift(null)
+      setDenominationCounts(initialDenominationState)
+      await loadFromDB()
 
       toast.success(
         variance === 0
@@ -434,6 +508,18 @@ export default function PayPage() {
               </div>
 
               <div className="space-y-3 rounded-lg border bg-background p-4">
+                <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">Shift Status</p>
+                  {currentShift ? (
+                    <>
+                      <p className="mt-1">Current shift: <span className="font-medium text-foreground">{currentShift.id.slice(0, 8)}…</span></p>
+                      <p>Opened at: <span className="font-medium text-foreground">{new Date(currentShift.openedAt).toLocaleString()}</span></p>
+                    </>
+                  ) : (
+                    <p className="mt-1">No open shift. Use <span className="font-medium text-foreground">Set / Reset Drawer Balance</span> to open a shift first.</p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground" htmlFor="counted-cash">Counted cash at close</label>
                   <Input
@@ -445,6 +531,35 @@ export default function PayPage() {
                     onChange={(e) => setCountedCashInput(e.target.value)}
                     disabled={!canManageDrawer}
                   />
+                </div>
+
+                <div className="space-y-3 rounded-md border p-3">
+                  <p className="text-sm font-semibold text-foreground">Denomination Close-out</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {LKR_DENOMINATIONS.map((denomination) => (
+                      <div key={denomination} className="grid grid-cols-[1fr_1fr] items-center gap-2">
+                        <label className="text-xs text-muted-foreground" htmlFor={`denom-${denomination}`}>
+                          {settings.currencySymbol}{denomination}
+                        </label>
+                        <Input
+                          id={`denom-${denomination}`}
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={denominationCounts[String(denomination)]}
+                          onChange={(e) =>
+                            setDenominationCounts((current) => ({
+                              ...current,
+                              [String(denomination)]: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Denomination total: <span className="font-semibold text-foreground">{settings.currencySymbol}{denominationTotal.toFixed(2)}</span>
+                  </p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3 text-sm">

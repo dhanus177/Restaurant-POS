@@ -130,6 +130,11 @@ export interface Supplier {
   totalPurchases?: number
   totalPayments?: number
   balanceDue?: number
+  aging0to30?: number
+  aging31to60?: number
+  aging61to90?: number
+  aging90plus?: number
+  overdueAmount?: number
 }
 
 export type SupplierLedgerEntryType = 'purchase' | 'payment' | 'grn' | 'return'
@@ -174,6 +179,58 @@ export interface CashDrawerReport {
   closedBy: string
 }
 
+export interface Shift {
+  id: string
+  openedAt: string
+  openedBy: string
+  openingFloat: number
+  status: 'open' | 'closed' | string
+  notes?: string | null
+  closedAt?: string | null
+  closedBy?: string | null
+  expectedCash?: number | null
+  countedCash?: number | null
+  variance?: number | null
+  denominations?: Record<string, number> | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BackupSchedule {
+  id: string
+  enabled: boolean
+  frequencyHours: number
+  retentionCount: number
+  verifyChecksum: boolean
+  lastRunAt?: string | null
+  nextRunAt?: string | null
+  updatedAt: string
+}
+
+export interface BackupSnapshot {
+  id: string
+  trigger: string
+  checksum: string
+  verified: boolean
+  sizeBytes: number
+  exportedAt: string
+  createdBy?: string | null
+  createdAt: string
+}
+
+export interface AuditLog {
+  id: string
+  action: string
+  resource: string
+  resourceId?: string | null
+  details?: unknown
+  actorId?: string | null
+  actorName?: string | null
+  actorRole?: string | null
+  ipAddress?: string | null
+  createdAt: string
+}
+
 export interface InventoryItem {
   id: string
   name: string
@@ -211,4 +268,5 @@ export interface Settings {
   currencySymbol: string
   receiptFooter: string
   logo?: string
+  requireCustomerBeforeOrder?: boolean
 }

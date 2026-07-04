@@ -13,6 +13,7 @@ type SetupBody = {
     currencySymbol?: string
     receiptFooter?: string
     logo?: string
+    requireCustomerBeforeOrder?: boolean
   }
   owner?: {
     name?: string
@@ -73,6 +74,7 @@ export async function POST(req: Request) {
         currencySymbol: restaurant.currencySymbol?.trim() ?? 'Rs',
         receiptFooter: restaurant.receiptFooter?.trim() ?? 'Thank you for dining with us!',
         logo: restaurant.logo?.trim() || '',
+        requireCustomerBeforeOrder: restaurant.requireCustomerBeforeOrder ?? false,
       },
       create: {
         id: 'singleton',
@@ -84,6 +86,7 @@ export async function POST(req: Request) {
         currencySymbol: restaurant.currencySymbol?.trim() ?? 'Rs',
         receiptFooter: restaurant.receiptFooter?.trim() ?? 'Thank you for dining with us!',
         logo: restaurant.logo?.trim() || '',
+        requireCustomerBeforeOrder: restaurant.requireCustomerBeforeOrder ?? false,
       },
     })
 

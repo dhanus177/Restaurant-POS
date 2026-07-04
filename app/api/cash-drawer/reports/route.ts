@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveLicense, requireRole } from '@/lib/server-guards'
+import { writeAuditLog } from '@/lib/audit-log'
 
 function toAppReport(report: {
   id: string
@@ -55,6 +56,20 @@ export async function POST(req: Request) {
       variance,
       notes: typeof body?.notes === 'string' ? body.notes : null,
       closedBy: actor.value.id,
+    },
+  })
+
+  await writeAuditLog({
+    req,
+    actor: actor.value,
+    action: 'cash_drawer.close_out',
+    resource: 'cash_drawer_report',
+    resourceId: report.id,
+    details: {
+      openingBalance,
+      expectedBalance,
+      countedCash,
+      variance,
     },
   })
 

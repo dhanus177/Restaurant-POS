@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireActiveLicense, requireRole } from '@/lib/server-guards'
+import { writeAuditLog } from '@/lib/audit-log'
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const licenseError = await requireActiveLicense()
@@ -23,6 +24,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const user = await prisma.user.update({ where: { id }, data: body })
+
+  await writeAuditLog({
+    req,
+    actor: actor.value,
+    action: 'user.update',
+    resource: 'user',
+    resourceId: user.id,
+    details: {
+      before: {
+        name: existingUser.name,
+        role: existingUser.role,
+      },
+      after: {
+        name: user.name,
+        role: user.role,
+      },
+    },
+  })
+
   return NextResponse.json(user)
 }
 
@@ -45,5 +65,18 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }
 
   await prisma.user.delete({ where: { id } })
+
+  await writeAuditLog({
+    req,
+    actor: actor.value,
+    action: 'user.delete',
+    resource: 'user',
+    resourceId: existingUser.id,
+    details: {
+      name: existingUser.name,
+      role: existingUser.role,
+    },
+  })
+
   return new NextResponse(null, { status: 204 })
 }
