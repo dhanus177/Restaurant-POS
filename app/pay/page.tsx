@@ -9,10 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentModal } from '@/components/pos/payment-modal'
 import { generateBillCode } from '@/lib/print'
 import type { Order, Shift } from '@/lib/types'
-import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check, DollarSign } from 'lucide-react'
+import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check, DollarSign, Wallet, HandCoins, BadgeDollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
 const LKR_DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const
@@ -51,6 +52,9 @@ export default function PayPage() {
   const [closeoutNotes, setCloseoutNotes] = useState('')
   const [currentShift, setCurrentShift] = useState<Shift | null>(null)
   const [denominationCounts, setDenominationCounts] = useState<Record<string, string>>(initialDenominationState)
+  const [showDrawerBalanceWindow, setShowDrawerBalanceWindow] = useState(false)
+  const [showCashSpendWindow, setShowCashSpendWindow] = useState(false)
+  const [showDenominationCloseoutWindow, setShowDenominationCloseoutWindow] = useState(false)
   const [isSavingDrawer, setIsSavingDrawer] = useState(false)
   const [isSavingCashOut, setIsSavingCashOut] = useState(false)
   const [isClosingDrawer, setIsClosingDrawer] = useState(false)
@@ -169,11 +173,13 @@ export default function PayPage() {
         if (shiftRes.ok) {
           const openedShift = (await shiftRes.json()) as Shift
           setCurrentShift(openedShift)
+            setShowDrawerBalanceWindow(false)
           toast.success('Cash drawer balance saved and shift opened')
           return
         }
       }
 
+        setShowDrawerBalanceWindow(false)
       toast.success('Cash drawer balance saved')
     } finally {
       setIsSavingDrawer(false)
@@ -211,6 +217,7 @@ export default function PayPage() {
 
       setCashOutAmount('')
       setCashOutReason('')
+      setShowCashSpendWindow(false)
       toast.success('Cash out recorded')
     } catch (error: any) {
       console.error(error)
@@ -265,6 +272,7 @@ export default function PayPage() {
 
       setCurrentShift(null)
       setDenominationCounts(initialDenominationState)
+      setShowDenominationCloseoutWindow(false)
       await loadFromDB()
 
       toast.success(
@@ -295,19 +303,6 @@ export default function PayPage() {
       return
     }
     if (!confirm(`Void order #${order.orderNumber}?`)) return
-    updateOrderStatus(order.id, 'cancelled')
-    if (order.tableId) {
-      updateTableStatus(order.tableId, 'available', undefined)
-    }
-  }
-
-  const handleRefund = (order: Order) => {
-    if (!canReverseBills) {
-      toast.error('Only admin and super-admin can refund bills')
-      return
-    }
-    if (!confirm(`Refund order #${order.orderNumber}?`)) return
-    updateOrderPayment(order.id, order.paymentMethod ?? 'cash', 'refunded')
     updateOrderStatus(order.id, 'cancelled')
     if (order.tableId) {
       updateTableStatus(order.tableId, 'available', undefined)
@@ -346,6 +341,75 @@ export default function PayPage() {
             </div>
           </div>
         </div>
+
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold">Pending Bills</h2>
+            <p className="text-sm text-muted-foreground">Collect payment by bill number, table, or bill code.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => router.push('/takeaway')} className="w-full gap-2 sm:w-auto">
+              <ShoppingBag className="h-4 w-4" />
+              Takeaway Counter
+            </Button>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/billing')}>
+              Go to Billing
+            </Button>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <Card className="mb-4">
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No pending bills found.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((order) => {
+              const billCode = generateBillCode(order.orderNumber, order.createdAt)
+              return (
+                <Card key={order.id} className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
+                  <CardHeader className="bg-emerald-50/70 pb-2 dark:bg-card/70">
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <span>#{order.orderNumber}</span>
+                      <Badge variant="secondary">Pending</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 p-5">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>{order.tableName || 'Takeaway'}</span>
+                      <span className="font-mono text-xs">{billCode}</span>
+                    </div>
+                    {order.customerName && (
+                      <div className="text-sm text-muted-foreground">
+                        Customer: {order.customerName}{order.customerPhone ? ` • ${order.customerPhone}` : ''}
+                      </div>
+                    )}
+                    <div className="rounded-xl bg-emerald-50 p-4 dark:bg-muted/30">
+                      <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Amount due</p>
+                      <div className="mt-1 text-3xl font-black text-foreground">{settings.currencySymbol}{order.total.toFixed(2)}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button className="h-12 w-full" size="lg" onClick={() => setSelectedOrder(order)}>
+                        Collect
+                      </Button>
+                      {canReverseBills ? (
+                        <Button className="h-12 w-full" variant="destructive" size="lg" onClick={() => handleVoid(order)}>
+                          Void
+                        </Button>
+                      ) : (
+                        <Button className="h-12 w-full" variant="destructive" size="lg" disabled title="Only admin and super-admin can void bills">
+                          Void
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
 
         <div className="mb-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <Card className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
@@ -425,30 +489,13 @@ export default function PayPage() {
 
               {canManageDrawer ? (
                 <div className="space-y-3 rounded-lg border bg-background p-4">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground" htmlFor="opening-balance">Opening balance</label>
-                      <Input
-                        id="opening-balance"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={openingBalanceInput}
-                        onChange={(e) => setOpeningBalanceInput(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground" htmlFor="drawer-notes">Notes</label>
-                      <Input
-                        id="drawer-notes"
-                        value={drawerNotes}
-                        onChange={(e) => setDrawerNotes(e.target.value)}
-                        placeholder="Optional note"
-                      />
-                    </div>
-                  </div>
-                  <Button className="w-full" onClick={() => void handleSaveCashDrawer()} disabled={isSavingDrawer}>
-                    {isSavingDrawer ? 'Saving...' : 'Set / Reset Drawer Balance'}
+                  <Button
+                    className="w-full gap-2 border-emerald-200 bg-emerald-600 text-white hover:bg-emerald-700 dark:border-emerald-800 dark:bg-emerald-500 dark:hover:bg-emerald-600"
+                    variant="secondary"
+                    onClick={() => setShowDrawerBalanceWindow(true)}
+                  >
+                    <Wallet className="h-4 w-4" />
+                    Cash Drawer Balance
                   </Button>
                 </div>
               ) : (
@@ -458,34 +505,38 @@ export default function PayPage() {
               )}
 
               <div className="space-y-3 rounded-lg border bg-background p-4">
-                <div className="text-sm font-semibold text-foreground">Cash Spending / Cash Out</div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground" htmlFor="cash-out-amount">Amount</label>
-                    <Input
-                      id="cash-out-amount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={cashOutAmount}
-                      onChange={(e) => setCashOutAmount(e.target.value)}
-                      disabled={!canRecordCashOut}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground" htmlFor="cash-out-reason">Reason</label>
-                    <Input
-                      id="cash-out-reason"
-                      value={cashOutReason}
-                      onChange={(e) => setCashOutReason(e.target.value)}
-                      placeholder="Petty cash, supplier advance..."
-                      disabled={!canRecordCashOut}
-                    />
-                  </div>
+                <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">Shift Status</p>
+                  {currentShift ? (
+                    <>
+                      <p className="mt-1">Current shift: <span className="font-medium text-foreground">{currentShift.id.slice(0, 8)}…</span></p>
+                      <p>Opened at: <span className="font-medium text-foreground">{new Date(currentShift.openedAt).toLocaleString()}</span></p>
+                    </>
+                  ) : (
+                    <p className="mt-1">No open shift. Use <span className="font-medium text-foreground">Set / Reset Drawer Balance</span> to open a shift first.</p>
+                  )}
                 </div>
-                <Button className="w-full" variant="outline" onClick={() => void handleCashOut()} disabled={isSavingCashOut || !canRecordCashOut}>
-                  {isSavingCashOut ? 'Saving cash out...' : 'Record Cash Out'}
-                </Button>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Button
+                    className="w-full gap-2 border-amber-200 bg-amber-500 text-white hover:bg-amber-600 dark:border-amber-800 dark:bg-amber-500 dark:hover:bg-amber-600"
+                    variant="outline"
+                    onClick={() => setShowCashSpendWindow(true)}
+                    disabled={!canRecordCashOut}
+                  >
+                    <HandCoins className="h-4 w-4" />
+                    Cash Spend
+                  </Button>
+                  <Button
+                    className="w-full gap-2 border-sky-200 bg-sky-600 text-white hover:bg-sky-700 dark:border-sky-800 dark:bg-sky-500 dark:hover:bg-sky-600"
+                    variant="secondary"
+                    onClick={() => setShowDenominationCloseoutWindow(true)}
+                    disabled={!canManageDrawer}
+                  >
+                    <BadgeDollarSign className="h-4 w-4" />
+                    Denomination Close-out
+                  </Button>
+                </div>
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Recent Cash Out Entries</p>
@@ -505,93 +556,6 @@ export default function PayPage() {
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="space-y-3 rounded-lg border bg-background p-4">
-                <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                  <p className="font-semibold text-foreground">Shift Status</p>
-                  {currentShift ? (
-                    <>
-                      <p className="mt-1">Current shift: <span className="font-medium text-foreground">{currentShift.id.slice(0, 8)}…</span></p>
-                      <p>Opened at: <span className="font-medium text-foreground">{new Date(currentShift.openedAt).toLocaleString()}</span></p>
-                    </>
-                  ) : (
-                    <p className="mt-1">No open shift. Use <span className="font-medium text-foreground">Set / Reset Drawer Balance</span> to open a shift first.</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="counted-cash">Counted cash at close</label>
-                  <Input
-                    id="counted-cash"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={countedCashInput}
-                    onChange={(e) => setCountedCashInput(e.target.value)}
-                    disabled={!canManageDrawer}
-                  />
-                </div>
-
-                <div className="space-y-3 rounded-md border p-3">
-                  <p className="text-sm font-semibold text-foreground">Denomination Close-out</p>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {LKR_DENOMINATIONS.map((denomination) => (
-                      <div key={denomination} className="grid grid-cols-[1fr_1fr] items-center gap-2">
-                        <label className="text-xs text-muted-foreground" htmlFor={`denom-${denomination}`}>
-                          {settings.currencySymbol}{denomination}
-                        </label>
-                        <Input
-                          id={`denom-${denomination}`}
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={denominationCounts[String(denomination)]}
-                          onChange={(e) =>
-                            setDenominationCounts((current) => ({
-                              ...current,
-                              [String(denomination)]: e.target.value,
-                            }))
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Denomination total: <span className="font-semibold text-foreground">{settings.currencySymbol}{denominationTotal.toFixed(2)}</span>
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3 text-sm">
-                  <div className="rounded-lg bg-emerald-50 p-3 dark:bg-muted/30">
-                    <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Expected</p>
-                    <p className="mt-1 font-bold text-foreground">{settings.currencySymbol}{drawerBalance.currentBalance.toFixed(2)}</p>
-                  </div>
-                  <div className="rounded-lg bg-background p-3 border">
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Counted</p>
-                    <p className="mt-1 font-bold text-foreground">{settings.currencySymbol}{(Number(countedCashInput) || 0).toFixed(2)}</p>
-                  </div>
-                  <div className={`rounded-lg p-3 border ${closeoutVariance === 0 ? 'bg-background' : closeoutVariance > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'}`}>
-                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Variance</p>
-                    <p className={`mt-1 font-bold ${closeoutVariance === 0 ? 'text-foreground' : closeoutVariance > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {closeoutVariance >= 0 ? '+' : '-'}{settings.currencySymbol}{Math.abs(closeoutVariance).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground" htmlFor="closeout-notes">Close-out notes</label>
-                  <Input
-                    id="closeout-notes"
-                    value={closeoutNotes}
-                    onChange={(e) => setCloseoutNotes(e.target.value)}
-                    placeholder="Optional closing note"
-                  />
-                </div>
-
-                <Button className="w-full" variant="secondary" onClick={() => void handleCloseCashDrawer()} disabled={isClosingDrawer || !canManageDrawer}>
-                  {isClosingDrawer ? 'Closing drawer...' : 'Close Drawer & Save Report'}
-                </Button>
               </div>
 
               <div className="space-y-3">
@@ -621,75 +585,8 @@ export default function PayPage() {
           </Card>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">Pending Bills</h2>
-            <p className="text-sm text-muted-foreground">Collect payment by bill number, table, or bill code.</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => router.push('/takeaway')} className="w-full gap-2 sm:w-auto">
-              <ShoppingBag className="h-4 w-4" />
-              Takeaway Counter
-            </Button>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/billing')}>Go to Billing</Button>
-          </div>
-        </div>
-
-        {filtered.length === 0 ? (
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              No pending bills found.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((order) => {
-              const billCode = generateBillCode(order.orderNumber, order.createdAt)
-              return (
-                <Card key={order.id} className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
-                  <CardHeader className="bg-emerald-50/70 pb-2 dark:bg-card/70">
-                    <CardTitle className="flex items-center justify-between text-lg">
-                      <span>#{order.orderNumber}</span>
-                      <Badge variant="secondary">Pending</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 p-5">
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>{order.tableName || 'Takeaway'}</span>
-                      <span className="font-mono text-xs">{billCode}</span>
-                    </div>
-                    {order.customerName && (
-                      <div className="text-sm text-muted-foreground">
-                        Customer: {order.customerName}{order.customerPhone ? ` • ${order.customerPhone}` : ''}
-                      </div>
-                    )}
-                    <div className="rounded-xl bg-emerald-50 p-4 dark:bg-muted/30">
-                      <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Amount due</p>
-                      <div className="mt-1 text-3xl font-black text-foreground">{settings.currencySymbol}{order.total.toFixed(2)}</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button className="h-12 w-full" size="lg" onClick={() => setSelectedOrder(order)}>
-                        Collect
-                      </Button>
-                      {canReverseBills ? (
-                        <Button className="h-12 w-full" variant="destructive" size="lg" onClick={() => handleVoid(order)}>
-                          Void
-                        </Button>
-                      ) : (
-                        <Button className="h-12 w-full" variant="destructive" size="lg" disabled title="Only admin and super-admin can void bills">
-                          Void
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
-
         <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-3">Recent Paid Bills (Refund)</h3>
+          <h3 className="text-lg font-semibold mb-3">Recent Paid Bills</h3>
           {paidOrders.length === 0 ? (
             <Card>
               <CardContent className="py-6 text-sm text-muted-foreground">No paid bills yet.</CardContent>
@@ -717,11 +614,6 @@ export default function PayPage() {
                           Complete Order
                         </Button>
                       )}
-                      {canReverseBills ? (
-                        <Button variant="destructive" onClick={() => handleRefund(order)}>Refund</Button>
-                      ) : (
-                        <Button variant="destructive" disabled title="Only admin and super-admin can refund bills">Refund</Button>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -730,6 +622,179 @@ export default function PayPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={showDrawerBalanceWindow} onOpenChange={setShowDrawerBalanceWindow}>
+        <DialogContent className="w-[95vw] max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Cash Drawer Balance Window</DialogTitle>
+            <DialogDescription>Set or reset the drawer opening balance and notes in a separate window.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <p className="font-semibold text-foreground">Current drawer snapshot</p>
+              <p className="mt-1">Opening balance: {settings.currencySymbol}{drawerBalance.openingBalance.toFixed(2)}</p>
+              <p>Current balance: {settings.currencySymbol}{drawerBalance.currentBalance.toFixed(2)}</p>
+              <p>Shift: {currentShift ? currentShift.id.slice(0, 8) : 'Not opened yet'}</p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="opening-balance-dialog">Opening balance</label>
+                <Input
+                  id="opening-balance-dialog"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={openingBalanceInput}
+                  onChange={(e) => setOpeningBalanceInput(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="drawer-notes-dialog">Notes</label>
+                <Input
+                  id="drawer-notes-dialog"
+                  value={drawerNotes}
+                  onChange={(e) => setDrawerNotes(e.target.value)}
+                  placeholder="Optional note"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDrawerBalanceWindow(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSaveCashDrawer()} disabled={isSavingDrawer || !canManageDrawer}>
+              {isSavingDrawer ? 'Saving...' : 'Set / Reset Drawer Balance'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCashSpendWindow} onOpenChange={setShowCashSpendWindow}>
+        <DialogContent className="w-[95vw] max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Cash Spend Window</DialogTitle>
+            <DialogDescription>Record petty cash, supplier advance, or any other cash out transaction.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="cash-out-amount-dialog">Amount</label>
+                <Input
+                  id="cash-out-amount-dialog"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cashOutAmount}
+                  onChange={(e) => setCashOutAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground" htmlFor="cash-out-reason-dialog">Reason</label>
+                <Input
+                  id="cash-out-reason-dialog"
+                  value={cashOutReason}
+                  onChange={(e) => setCashOutReason(e.target.value)}
+                  placeholder="Petty cash, supplier advance..."
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Recent entries are still visible on the main pay screen for quick reference.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCashSpendWindow(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCashOut()} disabled={isSavingCashOut || !canRecordCashOut}>
+              {isSavingCashOut ? 'Saving...' : 'Record Cash Out'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDenominationCloseoutWindow} onOpenChange={setShowDenominationCloseoutWindow}>
+        <DialogContent className="w-[95vw] max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Denomination Close-out Window</DialogTitle>
+            <DialogDescription>Count the cash by denomination and save the drawer close-out report.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-sm font-semibold text-foreground">Denominations</p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {LKR_DENOMINATIONS.map((denomination) => (
+                  <div key={denomination} className="grid grid-cols-[1fr_1fr] items-center gap-2">
+                    <label className="text-xs text-muted-foreground" htmlFor={`dialog-denom-${denomination}`}>
+                      {settings.currencySymbol}{denomination}
+                    </label>
+                    <Input
+                      id={`dialog-denom-${denomination}`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={denominationCounts[String(denomination)]}
+                      onChange={(e) =>
+                        setDenominationCounts((current) => ({
+                          ...current,
+                          [String(denomination)]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Denomination total: <span className="font-semibold text-foreground">{settings.currencySymbol}{denominationTotal.toFixed(2)}</span>
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 text-sm">
+              <div className="rounded-lg bg-emerald-50 p-3 dark:bg-muted/30">
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Expected</p>
+                <p className="mt-1 font-bold text-foreground">{settings.currencySymbol}{drawerBalance.currentBalance.toFixed(2)}</p>
+              </div>
+              <div className="rounded-lg bg-background p-3 border">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Counted</p>
+                <p className="mt-1 font-bold text-foreground">{settings.currencySymbol}{(Number(countedCashInput) || 0).toFixed(2)}</p>
+              </div>
+              <div className={`rounded-lg p-3 border ${closeoutVariance === 0 ? 'bg-background' : closeoutVariance > 0 ? 'bg-emerald-50 dark:bg-emerald-500/10' : 'bg-red-50 dark:bg-red-500/10'}`}>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Variance</p>
+                <p className={`mt-1 font-bold ${closeoutVariance === 0 ? 'text-foreground' : closeoutVariance > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {closeoutVariance >= 0 ? '+' : '-'}{settings.currencySymbol}{Math.abs(closeoutVariance).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground" htmlFor="closeout-notes-dialog">Close-out notes</label>
+              <Input
+                id="closeout-notes-dialog"
+                value={closeoutNotes}
+                onChange={(e) => setCloseoutNotes(e.target.value)}
+                placeholder="Optional closing note"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDenominationCloseoutWindow(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCloseCashDrawer()} disabled={isClosingDrawer || !canManageDrawer}>
+              {isClosingDrawer ? 'Closing drawer...' : 'Close Drawer & Save Report'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <PaymentModal
         open={Boolean(selectedOrder)}
