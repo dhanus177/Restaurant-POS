@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { usePOSStore } from '@/lib/store'
 import { Header } from '@/components/shared/header'
@@ -21,6 +21,9 @@ import { Label } from '@/components/ui/label'
 function normalizePhoneNumber(value: string) {
   return value.replace(/\D/g, '')
 }
+
+const PHONE_KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0'] as const
+const MIN_PHONE_DIGITS_FOR_NEW_CUSTOMER = 7
 
 export default function POSPage() {
   const router = useRouter()
@@ -49,6 +52,9 @@ export default function POSPage() {
   const [newCustomerEmail, setNewCustomerEmail] = useState('')
   const [newCustomerNotes, setNewCustomerNotes] = useState('')
   const [isSavingCustomer, setIsSavingCustomer] = useState(false)
+  const [lastNameAutoFocusPhone, setLastNameAutoFocusPhone] = useState('')
+  const newCustomerNameInputRef = useRef<HTMLInputElement | null>(null)
+  const lastFeedbackAtRef = useRef(0)
   const isMobile = useIsMobile()
   const requireCustomerBeforeOrder = settings.requireCustomerBeforeOrder === true
 
@@ -80,7 +86,27 @@ export default function POSPage() {
     if (requireCustomerBeforeOrder && cart.length === 0 && !selectedCustomer) {
       setShowCustomerPrompt(true)
     }
-  }, [mounted, currentUser, cart.length, selectedCustomer])
+  }, [mounted, currentUser, requireCustomerBeforeOrder, cart.length, selectedCustomer])
+
+  useEffect(() => {
+    if (!showCustomerPrompt) return
+
+    if (!normalizedLookupPhone) {
+      if (lastNameAutoFocusPhone) {
+        setLastNameAutoFocusPhone('')
+      }
+      return
+    }
+
+    if (existingCustomerMatch) return
+    if (normalizedLookupPhone.length < MIN_PHONE_DIGITS_FOR_NEW_CUSTOMER) return
+    if (lastNameAutoFocusPhone === normalizedLookupPhone) return
+
+    setLastNameAutoFocusPhone(normalizedLookupPhone)
+    requestAnimationFrame(() => {
+      newCustomerNameInputRef.current?.focus()
+    })
+  }, [showCustomerPrompt, normalizedLookupPhone, existingCustomerMatch, lastNameAutoFocusPhone])
 
   const ensureCustomerReady = () => {
     if (!requireCustomerBeforeOrder) return true
@@ -137,6 +163,65 @@ export default function POSPage() {
     setSelectedItem(null)
   }
 
+  const setLookupPhone = (value: string) => {
+    const normalized = normalizePhoneNumber(value)
+    setCustomerPhoneLookup(normalized)
+    setNewCustomerPhone(normalized)
+  }
+
+  const triggerKeypadFeedback = () => {
+    if (typeof window === 'undefined') return
+
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(14)
+    }
+
+    const now = Date.now()
+    if (now - lastFeedbackAtRef.current < 45) return
+    lastFeedbackAtRef.current = now
+
+    try {
+      const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioCtx) return
+
+      const context = new AudioCtx()
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(880, context.currentTime)
+      gain.gain.setValueAtTime(0.0001, context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.015, context.currentTime + 0.01)
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.07)
+
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.start()
+      oscillator.stop(context.currentTime + 0.08)
+      oscillator.onended = () => {
+        void context.close()
+      }
+    } catch {
+      // Ignore feedback API failures (browser/device restrictions)
+    }
+  }
+
+  const handlePhoneKeypadPress = (key: string) => {
+    triggerKeypadFeedback()
+    const next = `${normalizedLookupPhone}${key}`
+    setLookupPhone(next)
+  }
+
+  const handlePhoneBackspace = () => {
+    triggerKeypadFeedback()
+    setLookupPhone(normalizedLookupPhone.slice(0, -1))
+  }
+
+  const handlePhoneClear = () => {
+    triggerKeypadFeedback()
+    setLookupPhone('')
+  }
+
   const handleConfirmCustomer = async () => {
     if (!normalizedLookupPhone) {
       toast.error('Phone number is required')
@@ -171,9 +256,9 @@ export default function POSPage() {
 
       setSelectedCustomer(created)
       setShowCustomerPrompt(false)
-      setCustomerPhoneLookup('')
+      handlePhoneClear()
+      setLastNameAutoFocusPhone('')
       setNewCustomerName('')
-      setNewCustomerPhone('')
       setNewCustomerEmail('')
       setNewCustomerNotes('')
       toast.success(`Customer created: ${created.name}`)
@@ -313,12 +398,44 @@ export default function POSPage() {
                 id="customer-phone-lookup"
                 value={customerPhoneLookup}
                 onChange={(e) => {
-                  setCustomerPhoneLookup(e.target.value)
-                  setNewCustomerPhone(e.target.value)
+                  setLookupPhone(e.target.value)
                 }}
                 placeholder="Enter phone number"
                 autoFocus
               />
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Keypad</p>
+              <div className="grid grid-cols-3 gap-2">
+                {PHONE_KEYPAD_KEYS.map((key) => (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant="outline"
+                    className="h-11 text-base font-semibold"
+                    onClick={() => handlePhoneKeypadPress(key)}
+                  >
+                    {key}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-11 text-sm"
+                  onClick={handlePhoneBackspace}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 text-sm"
+                  onClick={handlePhoneClear}
+                >
+                  Clear
+                </Button>
+              </div>
             </div>
 
             {existingCustomerMatch ? (
@@ -340,6 +457,7 @@ export default function POSPage() {
                   <Label htmlFor="new-customer-name">Name</Label>
                   <Input
                     id="new-customer-name"
+                    ref={newCustomerNameInputRef}
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     placeholder="Customer name"
