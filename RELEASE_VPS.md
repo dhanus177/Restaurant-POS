@@ -25,6 +25,33 @@ This project now ships with Docker-based production release paths that work on b
 
 > Note: the compose stack injects `DATABASE_URL` automatically to point at the internal `db` service.
 
+### 2.1) One-command installers (recommended)
+
+From repository root:
+
+- Linux HTTPS (recommended):
+  - `bash deploy/install-linux.sh ssl`
+- Linux HTTP:
+  - `bash deploy/install-linux.sh http`
+- Windows HTTPS (recommended):
+  - `powershell -ExecutionPolicy Bypass -File deploy/install-windows.ps1 -Mode ssl`
+- Windows HTTP:
+  - `powershell -ExecutionPolicy Bypass -File deploy/install-windows.ps1 -Mode http`
+
+The installers will:
+
+1. Verify Docker + Docker Compose availability.
+2. Create `.env` from `.env.example` if missing.
+3. Validate required production variables are not placeholders.
+4. Build and start the selected stack.
+
+You can also run through npm wrappers:
+
+- `npm run release:install:linux`
+- `npm run release:install:http:linux`
+- `npm run release:install:windows`
+- `npm run release:install:http:windows`
+
 ### 3) Build and start HTTP stack (Linux VPS)
 
 ```bash
