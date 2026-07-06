@@ -25,7 +25,7 @@ This project now ships with Docker-based production release paths that work on b
 
 > Note: the compose stack injects `DATABASE_URL` automatically to point at the internal `db` service.
 
-### 2.1) One-command installers (recommended)
+### 2.1 One-command installers (recommended)
 
 From repository root:
 
