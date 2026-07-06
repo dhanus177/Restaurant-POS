@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSetupStatus, validateSetupSecret } from '@/lib/setup'
+import { getSetupStatus, validateActivationKey, validateSetupSecret } from '@/lib/setup'
 
 type SetupBody = {
   setupSecret?: string
+  activationKey?: string
   restaurant?: {
     restaurantName?: string
     address?: string
@@ -43,6 +44,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'This instance is already partially configured. Activation-only mode or manual cleanup is required.' }, { status: 409 })
   }
 
+  const activationCheck = status.hasActiveLicense
+    ? { ok: true as const, activationKey: undefined }
+    : validateActivationKey(body.activationKey ?? '')
+
+  if (!activationCheck.ok) {
+    return NextResponse.json({ error: activationCheck.reason }, { status: 400 })
+  }
+
   const restaurant = body.restaurant
   const owner = body.owner
 
@@ -63,6 +72,25 @@ export async function POST(req: Request) {
   const ownerPin = owner.pin
 
   const created = await prisma.$transaction(async (tx) => {
+    if (!status.hasActiveLicense && activationCheck.activationKey) {
+      await tx.license.upsert({
+        where: { id: 'singleton' },
+        update: {
+          activationKey: activationCheck.activationKey,
+          status: 'active',
+          tier: 'standard',
+          activatedAt: new Date(),
+        },
+        create: {
+          id: 'singleton',
+          activationKey: activationCheck.activationKey,
+          status: 'active',
+          tier: 'standard',
+          activatedAt: new Date(),
+        },
+      })
+    }
+
     const settings = await tx.settings.upsert({
       where: { id: 'singleton' },
       update: {
@@ -102,5 +130,13 @@ export async function POST(req: Request) {
     return { settings, user }
   })
 
-  return NextResponse.json({ ok: true, settings: created.settings, owner: created.user }, { status: 201 })
+  return NextResponse.json(
+    {
+      ok: true,
+      settings: created.settings,
+      owner: created.user,
+      licenseActivated: !status.hasActiveLicense,
+    },
+    { status: 201 }
+  )
 }

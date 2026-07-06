@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "npx eslint .",
     "typecheck": "tsc --noEmit",
+    "license:key": "node scripts/generate-license-key.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

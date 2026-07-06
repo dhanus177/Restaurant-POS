@@ -87,7 +87,10 @@ export default function SetupPage() {
     void loadStatus()
   }, [router])
 
-  const canContinueSetup = useMemo(() => licenseActive && !activationOnly, [licenseActive, activationOnly])
+  const canContinueSetup = useMemo(() => {
+    if (activationOnly) return false
+    return licenseActive || activationKey.trim().length > 0
+  }, [licenseActive, activationKey, activationOnly])
 
   const handleCurrencyChange = (code: string) => {
     const currency = currencies.find((item) => item.code === code)
@@ -145,6 +148,11 @@ export default function SetupPage() {
       return
     }
 
+    if (!licenseActive && !activationKey.trim()) {
+      toast.error('Activation key is required for first installation.')
+      return
+    }
+
     if (!formData.restaurantName.trim()) {
       toast.error('Restaurant name is required.')
       return
@@ -172,6 +180,7 @@ export default function SetupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           setupSecret,
+          activationKey,
           restaurant: formData,
           owner: {
             name: ownerName,
@@ -186,7 +195,11 @@ export default function SetupPage() {
         throw new Error(payload.error || 'Setup failed')
       }
 
-      toast.success('Setup completed successfully. Please log in with the new super admin PIN.')
+      toast.success(
+        payload.licenseActivated
+          ? 'License validated and setup completed successfully. Please log in with the new super admin PIN.'
+          : 'Setup completed successfully. Please log in with the new super admin PIN.'
+      )
       router.push('/')
     } catch (error) {
       console.error(error)
@@ -237,7 +250,7 @@ export default function SetupPage() {
               Secure activation
             </CardTitle>
             <CardDescription>
-              Enter the one-time setup secret and customer activation key to unlock this deployment.
+              Enter the one-time setup secret and customer activation key. First installation is blocked on the server until the key is valid.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/sonner'
 import { DBProvider } from '@/components/db-provider'
 import { ThemeProvider } from '@/components/theme-provider'
+import { PWARegister } from '@/components/pwa-register'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
   title: 'restaurant-pos',
   description: 'Restaurant Point of Sale System with Kitchen Display and Inventory Management',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',
@@ -33,6 +35,7 @@ export default function RootLayout({
             {children}
           </DBProvider>
         </ThemeProvider>
+        <PWARegister />
         <Toaster position="top-right" richColors />
         <Analytics />
       </body>
