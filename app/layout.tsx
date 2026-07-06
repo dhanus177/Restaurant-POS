@@ -11,8 +11,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'restaurant-pos',
-  description: 'Restaurant Point of Sale System with Kitchen Display and Inventory Management',
+  title: 'Veztra Soft POS',
+  description: 'Veztra Soft Restaurant Point of Sale System with Kitchen Display and Inventory Management',
   generator: 'v0.app',
   manifest: '/manifest.webmanifest',
   icons: {

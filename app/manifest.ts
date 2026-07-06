@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Restaurant POS',
-    short_name: 'POS',
-    description: 'Restaurant Point of Sale System with Kitchen Display and Inventory Management',
+    name: 'Veztra Soft POS',
+    short_name: 'Veztra POS',
+    description: 'Veztra Soft Restaurant Point of Sale System with Kitchen Display and Inventory Management',
     start_url: '/',
     display: 'standalone',
     background_color: '#0f172a',

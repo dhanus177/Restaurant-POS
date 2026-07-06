@@ -423,7 +423,7 @@ export const mockOrders: Order[] = [
 ]
 
 export const mockSettings: Settings = {
-  restaurantName: 'restaurant-pos',
+  restaurantName: 'Veztra Soft',
   address: '123 Main Street, Downtown',
   phone: '(555) 123-4567',
   taxRate: 10,

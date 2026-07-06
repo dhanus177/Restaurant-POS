@@ -340,7 +340,7 @@ export default function ReportsPage() {
     const generatedAt = new Date().toISOString()
 
     const rawLines = [
-      'Restaurant POS Report',
+      'Veztra Soft POS Report',
       `Generated: ${generatedAt}`,
       `Range: ${rangeLabel}`,
       `Total Sales: ${settings.currencySymbol}${totals.totalSales.toFixed(2)}`,

@@ -221,9 +221,9 @@ export default function SetupPage() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">restaurant-pos setup</h1>
+          <h1 className="text-3xl font-bold text-foreground">Veztra Soft setup</h1>
           <p className="mt-2 text-muted-foreground">
-            Activate this instance and configure the restaurant before staff can sign in.
+            Activate this Veztra Soft POS instance and configure the restaurant before staff can sign in.
           </p>
         </div>
 

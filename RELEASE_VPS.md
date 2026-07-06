@@ -1,4 +1,4 @@
-## Restaurant POS release deployment (Linux + Windows VPS)
+## Veztra Soft POS release deployment (Linux + Windows VPS)
 
 This project now ships with Docker-based production release paths that work on both Linux and Windows VPS:
 
