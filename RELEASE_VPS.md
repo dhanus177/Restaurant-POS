@@ -131,9 +131,10 @@ Use the generated value in server `.env` as `LICENSE_ACTIVATION_KEYS`.
 If your `.env` looks empty in the editor, paste this block into `.env` and save:
 
 ```dotenv
-# PostgreSQL connection string (for Prisma on Ubuntu host)
-# NOTE: password has '@' so DATABASE_URL uses %40
-DATABASE_URL="postgresql://posuser:Yoshie%40123@localhost:5432/vr_pos"
+# PostgreSQL connection string
+# Use localhost when running Prisma/Node directly on Ubuntu host.
+# If running inside Docker app container, use host `db` instead.
+DATABASE_URL="postgresql://posuser:yoshie123@localhost:5432/vr_pos"
 
 # First-run setup and activation
 SETUP_SECRET="change-this-setup-secret"
@@ -150,7 +151,7 @@ ALLOW_BACKUP_IN_PRODUCTION="true"
 # Docker Compose DB settings
 POSTGRES_DB="vr_pos"
 POSTGRES_USER="posuser"
-POSTGRES_PASSWORD="Yoshie@123"
+POSTGRES_PASSWORD="yoshie123"
 
 # HTTPS settings (update for your real domain)
 APP_DOMAIN="your-pos-domain.com"
@@ -161,4 +162,10 @@ After saving `.env`, run:
 
 ```bash
 npx prisma db pull
+```
+
+If you run Prisma inside Docker app container, use:
+
+```dotenv
+DATABASE_URL="postgresql://posuser:yoshie123@db:5432/vr_pos"
 ```
