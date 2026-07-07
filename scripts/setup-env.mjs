@@ -4,39 +4,29 @@ import path from 'node:path'
 const args = new Set(process.argv.slice(2))
 const showHelp = args.has('--help') || args.has('-h')
 const force = args.has('--force')
-const preferDev = args.has('--dev')
-const preferProd = args.has('--prod')
+const prefersLegacySourceFlag = args.has('--dev') || args.has('--prod')
 
 if (showHelp) {
-  console.log('Usage: node scripts/setup-env.mjs [--dev|--prod] [--force]')
+  console.log('Usage: node scripts/setup-env.mjs [--force]')
   console.log('')
-  console.log('Creates .env automatically from available templates.')
+  console.log('Creates .env from .env.production.')
   console.log('')
   console.log('Options:')
-  console.log('  --dev     Prefer .env.example first, then .env.production')
-  console.log('  --prod    Prefer .env.production first, then .env.example (default)')
   console.log('  --force   Overwrite existing .env')
   process.exit(0)
 }
 
-if (preferDev && preferProd) {
-  console.error('[env:setup] Use only one of --dev or --prod.')
-  process.exit(1)
+if (prefersLegacySourceFlag) {
+  console.warn('[env:setup] --dev/--prod flags are deprecated. Using .env.production only.')
 }
 
 const root = process.cwd()
 const target = path.join(root, '.env')
 
-const candidateFiles = preferDev
-  ? ['.env.example', '.env.production']
-  : ['.env.production', '.env.example']
+const source = path.join(root, '.env.production')
 
-const source = candidateFiles
-  .map((file) => path.join(root, file))
-  .find((filePath) => fs.existsSync(filePath))
-
-if (!source) {
-  console.error('[env:setup] No source template found. Expected .env.production or .env.example')
+if (!fs.existsSync(source)) {
+  console.error('[env:setup] Missing source template: .env.production')
   process.exit(1)
 }
 

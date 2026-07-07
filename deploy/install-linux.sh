@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-ssl}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env"
-ENV_EXAMPLE="$ROOT_DIR/.env.example"
+ENV_TEMPLATE="$ROOT_DIR/.env.production"
 
 log() {
   echo "[install-linux] $*"
@@ -81,9 +81,9 @@ require_command docker
 docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is required (docker compose)."
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  [[ -f "$ENV_EXAMPLE" ]] || fail "Missing .env.example"
-  cp "$ENV_EXAMPLE" "$ENV_FILE"
-  log "Created .env from .env.example"
+  [[ -f "$ENV_TEMPLATE" ]] || fail "Missing .env.production"
+  cp "$ENV_TEMPLATE" "$ENV_FILE"
+  log "Created .env from .env.production"
 fi
 
 validate_key SETUP_SECRET

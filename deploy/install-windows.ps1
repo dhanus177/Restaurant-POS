@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $RootDir = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $EnvFile = Join-Path $RootDir '.env'
-$EnvExample = Join-Path $RootDir '.env.example'
+$EnvTemplate = Join-Path $RootDir '.env.production'
 
 function Write-Log {
   param([string]$Message)
@@ -67,12 +67,12 @@ if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
 docker compose version | Out-Null
 
 if (!(Test-Path $EnvFile)) {
-  if (!(Test-Path $EnvExample)) {
-    Fail 'Missing .env.example'
+  if (!(Test-Path $EnvTemplate)) {
+    Fail 'Missing .env.production'
   }
 
-  Copy-Item $EnvExample $EnvFile
-  Write-Log 'Created .env from .env.example'
+  Copy-Item $EnvTemplate $EnvFile
+  Write-Log 'Created .env from .env.production'
 }
 
 Validate-Key -Key 'SETUP_SECRET'

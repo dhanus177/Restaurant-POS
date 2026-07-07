@@ -14,7 +14,7 @@ This project now ships with Docker-based production release paths that work on b
 
 ### 2) Prepare environment
 
-1. Copy `.env.example` to `.env`.
+1. Copy `.env.production` to `.env`.
 2. Set these values before first production run:
    - `SETUP_SECRET`
    - `LICENSE_ACTIVATION_KEYS`
@@ -41,7 +41,7 @@ From repository root:
 The installers will:
 
 1. Verify Docker + Docker Compose availability.
-2. Create `.env` from `.env.example` if missing.
+2. Create `.env` from `.env.production` if missing.
 3. Validate required production variables are not placeholders.
 4. Build and start the selected stack.
 
@@ -56,7 +56,7 @@ You can also run through npm wrappers:
 
 ```bash
 cd /opt/Restaurant-POS
-cp .env.example .env
+cp .env.production .env
 # edit .env
 npm run release:up
 ```
@@ -65,7 +65,7 @@ npm run release:up
 
 ```powershell
 Set-Location C:\apps\Restaurant-POS
-Copy-Item .env.example .env
+Copy-Item .env.production .env
 # edit .env
 npm run release:up
 ```
@@ -78,7 +78,7 @@ Linux:
 
 ```bash
 cd /opt/Restaurant-POS
-cp .env.example .env
+cp .env.production .env
 # edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, SETUP_SECRET, LICENSE_ACTIVATION_KEYS)
 npm run release:up:ssl
 ```
@@ -87,7 +87,7 @@ Windows PowerShell:
 
 ```powershell
 Set-Location C:\apps\Restaurant-POS
-Copy-Item .env.example .env
+Copy-Item .env.production .env
 # edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, SETUP_SECRET, LICENSE_ACTIVATION_KEYS)
 npm run release:up:ssl
 ```

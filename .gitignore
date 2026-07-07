@@ -10,7 +10,6 @@ next.user-config.*
 # Environment variables
 .env
 .env.*
-!.env.example
 .env*.local
 
 # Common ignores
