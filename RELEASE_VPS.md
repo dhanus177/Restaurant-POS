@@ -125,3 +125,40 @@ Use the generated value in server `.env` as `LICENSE_ACTIVATION_KEYS`.
 - PostgreSQL data persists in Docker volume: `pos-db-data`
 - HTTPS certificates persist in Docker volume: `caddy-data`
 - Include this volume in your VPS backup routine.
+
+### 9) Copy-paste `.env` for Ubuntu VPS
+
+If your `.env` looks empty in the editor, paste this block into `.env` and save:
+
+```dotenv
+# PostgreSQL connection string (for Prisma on Ubuntu host)
+# NOTE: password has '@' so DATABASE_URL uses %40
+DATABASE_URL="postgresql://posuser:Yoshie%40123@localhost:5432/vr_pos"
+
+# First-run setup and activation
+SETUP_SECRET="change-this-setup-secret"
+LICENSE_ACTIVATION_KEYS="replace-with-your-activation-key"
+
+# App behavior
+NEXT_PUBLIC_DEMO_MODE="false"
+
+# Safety toggles
+ALLOW_SEED_IN_PRODUCTION="false"
+ALLOW_RESTORE_IN_PRODUCTION="false"
+ALLOW_BACKUP_IN_PRODUCTION="true"
+
+# Docker Compose DB settings
+POSTGRES_DB="vr_pos"
+POSTGRES_USER="posuser"
+POSTGRES_PASSWORD="Yoshie@123"
+
+# HTTPS settings (update for your real domain)
+APP_DOMAIN="your-pos-domain.com"
+LETSENCRYPT_EMAIL="ops@your-pos-domain.com"
+```
+
+After saving `.env`, run:
+
+```bash
+npx prisma db pull
+```
