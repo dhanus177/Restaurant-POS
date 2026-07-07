@@ -14,6 +14,8 @@
     "env:setup:prod": "node scripts/setup-env.mjs --prod",
     "env:setup:force": "node scripts/setup-env.mjs --force",
     "env:setup:cmd": "scripts\\setup-env.cmd",
+    "setup": "npm run env:setup",
+    "setup:force": "npm run env:setup:force",
     "license:key": "node scripts/generate-license-key.mjs",
     "release:build": "docker build -t restaurant-pos:latest .",
     "release:up": "docker compose -f deploy/docker-compose.vps.yml up -d --build",
