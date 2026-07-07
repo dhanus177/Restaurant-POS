@@ -17,3 +17,7 @@ node_modules
 .next/
 .DS_Store
 *.tsbuildinfo
+
+# Local temporary DB/debug artifacts
+.pg-temp/
+prisma/schema.temp.prisma
