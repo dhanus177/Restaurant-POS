@@ -51,7 +51,7 @@ function Test-MissingOrPlaceholder {
   }
 }
 
-function Validate-Key {
+function Test-Key {
   param([string]$Key)
 
   $value = Get-EnvValue -Key $Key
@@ -75,13 +75,13 @@ if (!(Test-Path $EnvFile)) {
   Write-Log 'Created .env from .env.production'
 }
 
-Validate-Key -Key 'SETUP_SECRET'
-Validate-Key -Key 'LICENSE_ACTIVATION_KEYS'
-Validate-Key -Key 'POSTGRES_PASSWORD'
+Test-Key -Key 'SETUP_SECRET'
+Test-Key -Key 'LICENSE_ACTIVATION_KEYS'
+Test-Key -Key 'POSTGRES_PASSWORD'
 
 if ($Mode -eq 'ssl') {
-  Validate-Key -Key 'APP_DOMAIN'
-  Validate-Key -Key 'LETSENCRYPT_EMAIL'
+  Test-Key -Key 'APP_DOMAIN'
+  Test-Key -Key 'LETSENCRYPT_EMAIL'
   $composeFile = Join-Path $RootDir 'deploy/docker-compose.vps.ssl.yml'
 } else {
   $composeFile = Join-Path $RootDir 'deploy/docker-compose.vps.yml'
