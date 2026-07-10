@@ -20,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const nextRole = typeof body?.role === 'string' ? body.role : existingUser.role
   if ((existingUser.role === 'super-admin' || nextRole === 'super-admin') && actor.value.role !== 'super-admin') {
-    return NextResponse.json({ error: 'Only super admin can modify super-admin users.' }, { status: 403 })
+    return NextResponse.json({ error: 'Only super admin can edit super-admin users or promote accounts to super-admin.' }, { status: 403 })
   }
 
   const user = await prisma.user.update({ where: { id }, data: body })

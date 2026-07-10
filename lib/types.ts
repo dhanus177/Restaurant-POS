@@ -269,4 +269,6 @@ export interface Settings {
   receiptFooter: string
   logo?: string
   requireCustomerBeforeOrder?: boolean
+  takeawayPageEnabled?: boolean
+  kitchenPageEnabled?: boolean
 }

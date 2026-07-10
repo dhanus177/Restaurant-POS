@@ -22,6 +22,8 @@ interface HeaderProps {
 export function Header({ title }: HeaderProps) {
   const router = useRouter()
   const { currentUser, settings, logout } = usePOSStore()
+  const canAccessKitchen = settings.kitchenPageEnabled !== false || currentUser?.role === 'super-admin'
+  const canAccessTakeaway = settings.takeawayPageEnabled !== false || currentUser?.role === 'super-admin'
 
   const handleLogout = async () => {
     await logout()
@@ -75,12 +77,14 @@ export function Header({ title }: HeaderProps) {
                 POS
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/kitchen" className="gap-2">
-                <ChefHat className="h-4 w-4" />
-                Kitchen
-              </Link>
-            </Button>
+            {canAccessKitchen && (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/kitchen" className="gap-2">
+                  <ChefHat className="h-4 w-4" />
+                  Kitchen
+                </Link>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <Link href="/inventory" className="gap-2">
                 <Package className="h-4 w-4" />
@@ -93,12 +97,14 @@ export function Header({ title }: HeaderProps) {
                 Pay Counter
               </Link>
             </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/takeaway" className="gap-2">
-                <ShoppingBag className="h-4 w-4" />
-                Takeaway
-              </Link>
-            </Button>
+            {canAccessTakeaway && (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/takeaway" className="gap-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  Takeaway
+                </Link>
+              </Button>
+            )}
             <Button variant="ghost" size="sm" asChild>
               <Link href="/admin" className="gap-2">
                 <Settings className="h-4 w-4" />
@@ -149,7 +155,7 @@ export function Header({ title }: HeaderProps) {
                   POS Terminal
                 </Link>
               </DropdownMenuItem>
-              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'kitchen') && (
+              {canAccessKitchen && (['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'kitchen') && (
                 <DropdownMenuItem asChild>
                   <Link href="/kitchen" className="gap-2">
                     <ChefHat className="h-4 w-4" />
@@ -165,7 +171,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter' || currentUser?.role === 'cashier' || currentUser?.role === 'takeaway') && (
+              {canAccessTakeaway && (['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter' || currentUser?.role === 'cashier' || currentUser?.role === 'takeaway') && (
                 <DropdownMenuItem asChild>
                   <Link href="/takeaway" className="gap-2">
                     <ShoppingBag className="h-4 w-4" />

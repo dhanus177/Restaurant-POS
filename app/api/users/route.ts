@@ -20,30 +20,25 @@ export async function POST(req: Request) {
 
   let actorForAudit: { id?: string; role?: string; name?: string } = {}
 
-  if (body?.role === 'super-admin') {
-    // Super-admin creation is privileged. During first-time bootstrap (no users yet),
-    // setup flow should be used instead of /api/users.
-    if (existingUsersCount === 0) {
-      return NextResponse.json(
-        { error: 'Initial super-admin account must be created through setup.' },
-        { status: 403 }
-      )
-    }
+  // Super-admin bootstrap must happen through setup, not staff API.
+  if (body?.role === 'super-admin' && existingUsersCount === 0) {
+    return NextResponse.json(
+      { error: 'Initial super-admin account must be created through setup.' },
+      { status: 403 }
+    )
+  }
 
-    const superAdminActor = await requireRole(req, ['super-admin'])
-    if (!superAdminActor.ok) {
+  if (existingUsersCount > 0) {
+    const actor = await requireRole(req, ['admin', 'super-admin'])
+    if (!actor.ok) return actor.response
+
+    if (body?.role === 'super-admin' && actor.value.role !== 'super-admin') {
       return NextResponse.json(
         { error: 'Only super admin can create super-admin accounts.' },
         { status: 403 }
       )
     }
 
-    actorForAudit = superAdminActor.value
-  }
-
-  if (existingUsersCount > 0) {
-    const actor = await requireRole(req, ['admin', 'super-admin'])
-    if (!actor.ok) return actor.response
     actorForAudit = actor.value
   }
 

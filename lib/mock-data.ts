@@ -432,6 +432,8 @@ export const mockSettings: Settings = {
   receiptFooter: 'Thank you for dining with us!',
   logo: '',
   requireCustomerBeforeOrder: true,
+  takeawayPageEnabled: true,
+  kitchenPageEnabled: true,
 }
 
 export const mockProductRecipes = [

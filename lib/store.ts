@@ -87,9 +87,9 @@ interface POSStore {
   customers: Customer[]
   selectedCustomer: Customer | null
   setCurrentUser: (user: User | null) => void
-  addUser: (user: User) => void
-  updateUser: (id: string, user: Partial<User>) => void
-  deleteUser: (id: string) => void
+  addUser: (user: User) => Promise<string | null>
+  updateUser: (id: string, user: Partial<User>) => Promise<string | null>
+  deleteUser: (id: string) => Promise<string | null>
   addCustomer: (customer: Customer) => void
   createCustomer: (customer: Pick<Customer, 'name' | 'phone' | 'email' | 'notes'>) => Promise<Customer | null>
   updateCustomer: (id: string, customer: Partial<Customer>) => void
@@ -180,17 +180,69 @@ export const usePOSStore = create<POSStore>()(
       customers: mockCustomers,
       selectedCustomer: null,
       setCurrentUser: (user) => set({ currentUser: user }),
-      addUser: (user) => {
-        set((state) => ({ users: [...state.users, user] }))
-        dbSync('POST', '/api/users', user)
+      addUser: async (user) => {
+        try {
+          const response = await apiFetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user),
+          })
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => null)
+            return data?.error ?? 'Failed to add user'
+          }
+
+          const created = (await response.json()) as User
+          set((state) => ({
+            users: [...state.users.filter((existing) => existing.id !== created.id), created],
+          }))
+          return null
+        } catch (error) {
+          console.error('[addUser error]', error)
+          return 'Failed to add user'
+        }
       },
-      updateUser: (id, userData) => {
-        set((state) => ({ users: state.users.map((u) => (u.id === id ? { ...u, ...userData } : u)) }))
-        dbSync('PATCH', `/api/users/${id}`, userData)
+      updateUser: async (id, userData) => {
+        try {
+          const response = await apiFetch(`/api/users/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(userData),
+          })
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => null)
+            return data?.error ?? 'Failed to update user'
+          }
+
+          const updated = (await response.json()) as User
+          set((state) => ({
+            users: state.users.map((existing) => (existing.id === id ? updated : existing)),
+          }))
+          return null
+        } catch (error) {
+          console.error('[updateUser error]', error)
+          return 'Failed to update user'
+        }
       },
-      deleteUser: (id) => {
-        set((state) => ({ users: state.users.filter((u) => u.id !== id) }))
-        dbSync('DELETE', `/api/users/${id}`)
+      deleteUser: async (id) => {
+        try {
+          const response = await apiFetch(`/api/users/${id}`, {
+            method: 'DELETE',
+          })
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => null)
+            return data?.error ?? 'Failed to delete user'
+          }
+
+          set((state) => ({ users: state.users.filter((existing) => existing.id !== id) }))
+          return null
+        } catch (error) {
+          console.error('[deleteUser error]', error)
+          return 'Failed to delete user'
+        }
       },
       addCustomer: (customer) => {
         set((state) => ({ customers: [...state.customers, customer] }))

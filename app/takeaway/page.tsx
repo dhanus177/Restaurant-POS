@@ -33,6 +33,13 @@ export default function TakeawayPage() {
     }
   }, [currentUser, mounted, router])
 
+  useEffect(() => {
+    if (!mounted || !currentUser) return
+    if (settings.takeawayPageEnabled === false && currentUser.role !== 'super-admin') {
+      router.push('/pos')
+    }
+  }, [currentUser, mounted, router, settings.takeawayPageEnabled])
+
   const pendingTakeawayOrders = useMemo(
     () =>
       orders
@@ -79,6 +86,17 @@ export default function TakeawayPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
+  }
+
+  if (settings.takeawayPageEnabled === false && currentUser.role !== 'super-admin') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-foreground">Takeaway page is locked</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Please contact your super admin to enable access.</p>
+        </div>
       </div>
     )
   }

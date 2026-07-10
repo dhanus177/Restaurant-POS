@@ -194,6 +194,8 @@ model Settings {
   receiptFooter  String
   logo           String?
   requireCustomerBeforeOrder Boolean @default(false)
+  takeawayPageEnabled Boolean @default(true)
+  kitchenPageEnabled  Boolean @default(true)
 }
 
 model CashDrawer {

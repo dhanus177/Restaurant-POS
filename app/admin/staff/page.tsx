@@ -102,7 +102,7 @@ export default function StaffManagementPage() {
     setShowForm(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (formData.role === 'super-admin' && !canManageSuperAdmins) {
@@ -125,13 +125,21 @@ export default function StaffManagementPage() {
     }
 
     if (selectedUser) {
-      updateUser(selectedUser.id, formData)
+      const updateError = await updateUser(selectedUser.id, formData)
+      if (updateError) {
+        toast.error(updateError)
+        return
+      }
       toast.success('Staff member updated')
     } else {
-      addUser({
+      const addError = await addUser({
         id: `user-${Date.now()}`,
         ...formData,
       })
+      if (addError) {
+        toast.error(addError)
+        return
+      }
       toast.success('Staff member added')
     }
     setShowForm(false)
@@ -146,9 +154,13 @@ export default function StaffManagementPage() {
     setShowDeleteConfirm(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedUser) {
-      deleteUser(selectedUser.id)
+      const deleteError = await deleteUser(selectedUser.id)
+      if (deleteError) {
+        toast.error(deleteError)
+        return
+      }
       toast.success('Staff member deleted')
       setSelectedUser(null)
       setShowDeleteConfirm(false)

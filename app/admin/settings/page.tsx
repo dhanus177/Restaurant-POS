@@ -421,9 +421,52 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="takeawayPageEnabled">Takeaway page access</Label>
+              <Select
+                value={formData.takeawayPageEnabled !== false ? 'enabled' : 'disabled'}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    takeawayPageEnabled: value === 'enabled',
+                  })
+                }
+              >
+                <SelectTrigger id="takeawayPageEnabled">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enabled">Enabled</SelectItem>
+                  <SelectItem value="disabled">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="kitchenPageEnabled">Kitchen page access</Label>
+              <Select
+                value={formData.kitchenPageEnabled !== false ? 'enabled' : 'disabled'}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    kitchenPageEnabled: value === 'enabled',
+                  })
+                }
+              >
+                <SelectTrigger id="kitchenPageEnabled">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="enabled">Enabled</SelectItem>
+                  <SelectItem value="disabled">Disabled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             When enabled, staff must select or create a customer before starting a new order in POS.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Disable a page to lock access for all non-super-admin users.
           </p>
           </fieldset>
         </CardContent>

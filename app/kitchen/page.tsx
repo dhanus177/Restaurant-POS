@@ -11,7 +11,7 @@ import { Volume2, VolumeX, RefreshCw } from 'lucide-react'
 
 export default function KitchenPage() {
   const router = useRouter()
-  const { currentUser, orders } = usePOSStore()
+  const { currentUser, orders, settings } = usePOSStore()
   const [mounted, setMounted] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [lastOrderCount, setLastOrderCount] = useState(0)
@@ -26,6 +26,13 @@ export default function KitchenPage() {
       router.push('/')
     }
   }, [currentUser, mounted, router])
+
+  useEffect(() => {
+    if (!mounted || !currentUser) return
+    if (settings.kitchenPageEnabled === false && currentUser.role !== 'super-admin') {
+      router.push('/pos')
+    }
+  }, [currentUser, mounted, router, settings.kitchenPageEnabled])
 
   // Count pending orders
   const pendingCount = orders.filter((o) => o.status === 'pending').length
@@ -60,6 +67,17 @@ export default function KitchenPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
+  }
+
+  if (settings.kitchenPageEnabled === false && currentUser.role !== 'super-admin') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-foreground">Kitchen page is locked</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Please contact your super admin to enable access.</p>
+        </div>
       </div>
     )
   }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api'
 import { usePOSStore } from '@/lib/store'
+import { useIsMobile } from '@/hooks/use-mobile'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,7 +23,8 @@ const showDemoAccess = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { currentUser, loginWithPin, loadFromDB, settings } = usePOSStore()
+  const { currentUser, loginWithPin, loadFromDB, settings, logout } = usePOSStore()
+  const isMobile = useIsMobile()
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [checkingSetup, setCheckingSetup] = useState(true)
@@ -57,9 +59,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!checkingSetup && setupStatus?.setupComplete && currentUser) {
+      if (isMobile && !['super-admin', 'cashier'].includes(currentUser.role)) {
+        void logout()
+        setError('Mobile login is allowed only for Super Admin and Cashier roles')
+        setPin('')
+        return
+      }
       redirectToRole(currentUser.role)
     }
-  }, [checkingSetup, currentUser, setupStatus])
+  }, [checkingSetup, currentUser, setupStatus, isMobile, logout])
 
   const redirectToRole = (role: string) => {
     switch (role) {
@@ -96,6 +104,12 @@ export default function LoginPage() {
       if (newPin.length === 4) {
         const user = await loginWithPin(newPin)
         if (user) {
+          if (isMobile && !['super-admin', 'cashier'].includes(user.role)) {
+            await logout()
+            setError('Mobile login is allowed only for Super Admin and Cashier roles')
+            setTimeout(() => setPin(''), 300)
+            return
+          }
           redirectToRole(user.role)
         } else {
           setError('Invalid PIN')
@@ -116,6 +130,11 @@ export default function LoginPage() {
   }
 
   const handleQuickLogin = async (role: 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'pay-counter' | 'takeaway') => {
+    if (isMobile && !['cashier', 'super-admin'].includes(role)) {
+      setError('Mobile login is allowed only for Super Admin and Cashier roles')
+      return
+    }
+
     const pins: Record<string, string> = {
       cashier: '2222',
       kitchen: '3333',
@@ -126,6 +145,12 @@ export default function LoginPage() {
     }
     const user = await loginWithPin(pins[role])
     if (user) {
+      if (isMobile && !['super-admin', 'cashier'].includes(user.role)) {
+        await logout()
+        setError('Mobile login is allowed only for Super Admin and Cashier roles')
+        setPin('')
+        return
+      }
       redirectToRole(user.role)
     }
   }
@@ -269,6 +294,7 @@ export default function LoginPage() {
               size="lg"
               className="gap-2"
               onClick={() => handleQuickLogin('kitchen')}
+              disabled={isMobile}
             >
               <ChefHat className="h-5 w-5" />
               Kitchen
@@ -287,6 +313,7 @@ export default function LoginPage() {
               size="lg"
               className="gap-2"
               onClick={() => handleQuickLogin('pay-counter')}
+              disabled={isMobile}
             >
               <WalletCards className="h-5 w-5" />
               Pay Counter
@@ -296,6 +323,7 @@ export default function LoginPage() {
               size="lg"
               className="gap-2"
               onClick={() => handleQuickLogin('takeaway')}
+              disabled={isMobile}
             >
               <ShoppingBag className="h-5 w-5" />
               Takeaway Counter
