@@ -16,7 +16,6 @@
     "setup": "npm run env:setup",
     "setup:force": "npm run env:setup:force",
     "license:key": "node scripts/generate-license-key.mjs",
-    "setup:secret": "node scripts/generate-setup-secret.mjs",
     "release:build": "docker build -t restaurant-pos:latest .",
     "release:up": "docker compose -f deploy/docker-compose.vps.yml up -d --build",
     "release:up:ssl": "docker compose -f deploy/docker-compose.vps.ssl.yml up -d --build",

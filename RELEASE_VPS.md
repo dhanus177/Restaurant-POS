@@ -16,7 +16,6 @@ This project now ships with Docker-based production release paths that work on b
 
 1. Copy `.env.production` to `.env`.
 2. Set these values before first production run:
-   - `SETUP_SECRET`
    - `LICENSE_ACTIVATION_KEYS`
    - `POSTGRES_PASSWORD`
 3. For HTTPS stack also set:
@@ -79,7 +78,7 @@ Linux:
 ```bash
 cd /opt/Restaurant-POS
 cp .env.production .env
-# edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, SETUP_SECRET, LICENSE_ACTIVATION_KEYS)
+# edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, LICENSE_ACTIVATION_KEYS)
 npm run release:up:ssl
 ```
 
@@ -88,7 +87,7 @@ Windows PowerShell:
 ```powershell
 Set-Location C:\apps\Restaurant-POS
 Copy-Item .env.production .env
-# edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, SETUP_SECRET, LICENSE_ACTIVATION_KEYS)
+# edit .env (APP_DOMAIN, LETSENCRYPT_EMAIL, LICENSE_ACTIVATION_KEYS)
 npm run release:up:ssl
 ```
 
@@ -136,8 +135,7 @@ If your `.env` looks empty in the editor, paste this block into `.env` and save:
 # If running inside Docker app container, use host `db` instead.
 DATABASE_URL="postgresql://posuser:yoshie123@localhost:5432/vr_pos"
 
-# First-run setup and activation
-SETUP_SECRET="change-this-setup-secret"
+# First-run activation
 LICENSE_ACTIVATION_KEYS="replace-with-your-activation-key"
 
 # App behavior

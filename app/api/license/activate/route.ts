@@ -1,19 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { validateActivationKey, validateSetupSecret } from '@/lib/setup'
+import { validateActivationKey } from '@/lib/setup'
 
 type ActivationBody = {
-  setupSecret?: string
   activationKey?: string
 }
 
 export async function POST(req: Request) {
   const body = (await req.json()) as ActivationBody
-  const setupCheck = validateSetupSecret(body.setupSecret ?? '')
-
-  if (!setupCheck.ok) {
-    return NextResponse.json({ error: setupCheck.reason }, { status: 403 })
-  }
 
   const activationCheck = validateActivationKey(body.activationKey ?? '')
 

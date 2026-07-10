@@ -40,7 +40,6 @@ export default function SetupPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState<SetupStatus | null>(null)
-  const [setupSecret, setSetupSecret] = useState('')
   const [activationKey, setActivationKey] = useState('')
   const [licenseActive, setLicenseActive] = useState(false)
   const [isActivating, setIsActivating] = useState(false)
@@ -104,11 +103,6 @@ export default function SetupPage() {
   }
 
   const handleActivate = async () => {
-    if (!setupSecret.trim()) {
-      toast.error('Setup secret is required.')
-      return
-    }
-
     if (!activationKey.trim()) {
       toast.error('Activation key is required.')
       return
@@ -119,7 +113,7 @@ export default function SetupPage() {
       const response = await apiFetch('/api/license/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ setupSecret, activationKey }),
+        body: JSON.stringify({ activationKey }),
       })
 
       const payload = await response.json()
@@ -143,11 +137,6 @@ export default function SetupPage() {
   }
 
   const handleCreateSetup = async () => {
-    if (!setupSecret.trim()) {
-      toast.error('Setup secret is required.')
-      return
-    }
-
     if (!licenseActive && !activationKey.trim()) {
       toast.error('Activation key is required for first installation.')
       return
@@ -179,7 +168,6 @@ export default function SetupPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          setupSecret,
           activationKey,
           restaurant: formData,
           owner: {
@@ -250,21 +238,10 @@ export default function SetupPage() {
               Secure activation
             </CardTitle>
             <CardDescription>
-              Enter the one-time setup secret and customer activation key. First installation is blocked on the server until the key is valid.
+              Enter the customer activation key. First installation is blocked on the server until the key is valid.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="setup-secret">Setup Secret</Label>
-              <Input
-                id="setup-secret"
-                type="password"
-                value={setupSecret}
-                onChange={(e) => setSetupSecret(e.target.value)}
-                placeholder="Enter the setup secret"
-              />
-            </div>
-
             <div className="grid gap-2">
               <Label htmlFor="activation-key">Activation Key</Label>
               <Input

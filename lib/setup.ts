@@ -33,24 +33,6 @@ export async function getSetupStatus(): Promise<SetupStatus> {
   }
 }
 
-export function getConfiguredSetupSecret() {
-  return process.env.SETUP_SECRET?.trim() ?? ''
-}
-
-export function validateSetupSecret(secret: string) {
-  const configured = getConfiguredSetupSecret()
-
-  if (!configured) {
-    return { ok: false as const, reason: 'Setup secret is not configured on the server.' }
-  }
-
-  if (secret.trim() !== configured) {
-    return { ok: false as const, reason: 'Invalid setup secret.' }
-  }
-
-  return { ok: true as const }
-}
-
 export function getAllowedActivationKeys() {
   return (process.env.LICENSE_ACTIVATION_KEYS ?? '')
     .split(',')

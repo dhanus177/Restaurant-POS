@@ -42,7 +42,6 @@ function Test-MissingOrPlaceholder {
   if ([string]::IsNullOrWhiteSpace($Value)) { return $true }
 
   switch ($Key) {
-    'SETUP_SECRET' { return @('change-this-setup-secret', 'local-setup-secret') -contains $Value }
     'LICENSE_ACTIVATION_KEYS' { return @('replace-with-your-activation-key', 'LOCAL-DEV-KEY') -contains $Value }
     'POSTGRES_PASSWORD' { return @('change-me-strong-password', 'posdb_pass_2026', 'your_password_here') -contains $Value }
     'APP_DOMAIN' { return $Value -eq 'pos.example.com' -or $Value -eq 'example.com' -or $Value.EndsWith('example.com') }
@@ -75,7 +74,6 @@ if (!(Test-Path $EnvFile)) {
   Write-Log 'Created .env from .env.production'
 }
 
-Test-Key -Key 'SETUP_SECRET'
 Test-Key -Key 'LICENSE_ACTIVATION_KEYS'
 Test-Key -Key 'POSTGRES_PASSWORD'
 

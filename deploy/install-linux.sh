@@ -38,9 +38,6 @@ is_missing_or_placeholder() {
   fi
 
   case "$key" in
-    SETUP_SECRET)
-      [[ "$value" == "change-this-setup-secret" || "$value" == "local-setup-secret" ]] && return 0
-      ;;
     LICENSE_ACTIVATION_KEYS)
       [[ "$value" == "replace-with-your-activation-key" || "$value" == "LOCAL-DEV-KEY" ]] && return 0
       ;;
@@ -86,7 +83,6 @@ if [[ ! -f "$ENV_FILE" ]]; then
   log "Created .env from .env.production"
 fi
 
-validate_key SETUP_SECRET
 validate_key LICENSE_ACTIVATION_KEYS
 validate_key POSTGRES_PASSWORD
 
