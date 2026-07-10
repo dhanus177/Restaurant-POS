@@ -196,6 +196,22 @@ model Settings {
   requireCustomerBeforeOrder Boolean @default(false)
   takeawayPageEnabled Boolean @default(true)
   kitchenPageEnabled  Boolean @default(true)
+  whatsappReportsEnabled Boolean @default(false)
+  whatsappRecipient      String?
+  whatsappBreakfastTime  String  @default("11:00")
+  whatsappLunchTime      String  @default("16:00")
+  whatsappDinnerTime     String  @default("22:00")
+}
+
+model WhatsAppReportDispatch {
+  id         String   @id @default(cuid())
+  mealType   String
+  reportDate DateTime
+  sentAt     DateTime @default(now())
+  messageSid String?
+
+  @@unique([mealType, reportDate])
+  @@index([sentAt])
 }
 
 model CashDrawer {

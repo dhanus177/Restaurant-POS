@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         prisma.shift.deleteMany(),
         prisma.backupSnapshot.deleteMany(),
         prisma.backupSchedule.deleteMany(),
+        prisma.whatsAppReportDispatch.deleteMany(),
         prisma.cashDrawer.deleteMany(),
         prisma.cashDrawerExpense.deleteMany(),
         prisma.cashDrawerReport.deleteMany(),

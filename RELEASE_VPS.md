@@ -18,6 +18,7 @@ This project now ships with Docker-based production release paths that work on b
 2. Set these values before first production run:
    - `LICENSE_ACTIVATION_KEYS`
    - `POSTGRES_PASSWORD`
+  - (Optional for WhatsApp reports) `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `WHATSAPP_REPORTS_SCHEDULER_TOKEN`
 3. For HTTPS stack also set:
   - `APP_DOMAIN` (public DNS name pointing to VPS)
   - `LETSENCRYPT_EMAIL`
@@ -124,6 +125,25 @@ Use the generated value in server `.env` as `LICENSE_ACTIVATION_KEYS`.
 - PostgreSQL data persists in Docker volume: `pos-db-data`
 - HTTPS certificates persist in Docker volume: `caddy-data`
 - Include this volume in your VPS backup routine.
+
+### 10. WhatsApp daily report scheduler (optional)
+
+To auto-send breakfast/lunch/dinner reports, configure WhatsApp values in `.env` and call this endpoint every minute:
+
+- `POST /api/whatsapp-reports/schedule`
+- Header: `x-scheduler-token: <WHATSAPP_REPORTS_SCHEDULER_TOKEN>`
+
+Example Linux cron (every minute):
+
+```bash
+* * * * * curl -sS -X POST "https://<APP_DOMAIN>/api/whatsapp-reports/schedule" -H "x-scheduler-token: <TOKEN>" > /dev/null 2>&1
+```
+
+Example Windows Task Scheduler action (PowerShell):
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://<APP_DOMAIN>/api/whatsapp-reports/schedule" -Headers @{"x-scheduler-token"="<TOKEN>"}
+```
 
 ### 9. Copy-paste `.env` for Ubuntu VPS
 

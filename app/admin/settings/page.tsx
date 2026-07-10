@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download } from 'lucide-react'
+import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download, MessageCircle } from 'lucide-react'
 import Image from 'next/image'
 import { useTheme } from 'next-themes'
 
@@ -42,6 +42,7 @@ export default function SettingsPage() {
   const [isSavingSchedule, setIsSavingSchedule] = useState(false)
   const [isRunningScheduledBackup, setIsRunningScheduledBackup] = useState(false)
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false)
+  const [isSendingWhatsAppReport, setIsSendingWhatsAppReport] = useState(false)
   const [backupSchedule, setBackupSchedule] = useState<BackupSchedule | null>(null)
   const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshot[]>([])
   const canManageRestaurant = currentUser?.role === 'super-admin'
@@ -252,6 +253,36 @@ export default function SettingsPage() {
     }
   }
 
+  const handleSendWhatsAppReportNow = async () => {
+    if (!canManageRestaurant) return
+
+    setIsSendingWhatsAppReport(true)
+    try {
+      const res = await apiFetch('/api/whatsapp-reports/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      })
+
+      const payload = (await res.json().catch(() => null)) as
+        | { sent?: Array<{ meal: string }>; skipped?: Array<{ meal?: string; reason: string }>; error?: string }
+        | null
+
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Failed to trigger WhatsApp report send')
+      }
+
+      const sentCount = payload?.sent?.length ?? 0
+      const skippedCount = payload?.skipped?.length ?? 0
+      toast.success(`WhatsApp report run complete. Sent: ${sentCount}, Skipped: ${skippedCount}`)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to trigger WhatsApp reports')
+    } finally {
+      setIsSendingWhatsAppReport(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-3 sm:p-6">
       <div>
@@ -359,6 +390,117 @@ export default function SettingsPage() {
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             />
           </div>
+          </fieldset>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            WhatsApp Daily Reports
+          </CardTitle>
+          <CardDescription>
+            Send breakfast, lunch, and dinner sales summaries with customizable send times.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <fieldset disabled={!canManageRestaurant} className="space-y-4 disabled:pointer-events-none disabled:opacity-70">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="whatsappReportsEnabled">Daily WhatsApp reports</Label>
+                <Select
+                  value={formData.whatsappReportsEnabled === true ? 'enabled' : 'disabled'}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      whatsappReportsEnabled: value === 'enabled',
+                    })
+                  }
+                >
+                  <SelectTrigger id="whatsappReportsEnabled">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="enabled">Enabled</SelectItem>
+                    <SelectItem value="disabled">Disabled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="whatsappRecipient">Recipient number</Label>
+                <Input
+                  id="whatsappRecipient"
+                  placeholder="whatsapp:+94771234567"
+                  value={formData.whatsappRecipient ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      whatsappRecipient: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="whatsappBreakfastTime">Breakfast report time</Label>
+                <Input
+                  id="whatsappBreakfastTime"
+                  type="time"
+                  value={formData.whatsappBreakfastTime ?? '11:00'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      whatsappBreakfastTime: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="whatsappLunchTime">Lunch report time</Label>
+                <Input
+                  id="whatsappLunchTime"
+                  type="time"
+                  value={formData.whatsappLunchTime ?? '16:00'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      whatsappLunchTime: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="whatsappDinnerTime">Dinner report time</Label>
+                <Input
+                  id="whatsappDinnerTime"
+                  type="time"
+                  value={formData.whatsappDinnerTime ?? '22:00'}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      whatsappDinnerTime: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Tip: Add the recipient as <span className="font-mono">whatsapp:+countrycodeNumber</span> and ensure Twilio WhatsApp env vars are configured.
+            </p>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleSendWhatsAppReportNow()}
+              disabled={isSendingWhatsAppReport || isSaving || isBackingUp || isRestoring}
+            >
+              {isSendingWhatsAppReport ? 'Sending reports...' : 'Send Reports Now (Test)'}
+            </Button>
           </fieldset>
         </CardContent>
       </Card>

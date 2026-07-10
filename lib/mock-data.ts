@@ -434,6 +434,11 @@ export const mockSettings: Settings = {
   requireCustomerBeforeOrder: true,
   takeawayPageEnabled: true,
   kitchenPageEnabled: true,
+  whatsappReportsEnabled: false,
+  whatsappRecipient: '',
+  whatsappBreakfastTime: '11:00',
+  whatsappLunchTime: '16:00',
+  whatsappDinnerTime: '22:00',
 }
 
 export const mockProductRecipes = [

@@ -271,4 +271,9 @@ export interface Settings {
   requireCustomerBeforeOrder?: boolean
   takeawayPageEnabled?: boolean
   kitchenPageEnabled?: boolean
+  whatsappReportsEnabled?: boolean
+  whatsappRecipient?: string
+  whatsappBreakfastTime?: string
+  whatsappLunchTime?: string
+  whatsappDinnerTime?: string
 }
