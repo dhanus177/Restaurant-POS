@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveLicense, requireSuperAdmin } from '@/lib/server-guards'
 
@@ -21,10 +22,28 @@ export async function PATCH(req: Request) {
   }
 
   const body = await req.json()
-  const settings = await prisma.settings.upsert({
-    where: { id: 'singleton' },
-    update: body,
-    create: { id: 'singleton', ...body },
-  })
-  return NextResponse.json(settings)
+  try {
+    const settings = await prisma.settings.upsert({
+      where: { id: 'singleton' },
+      update: body,
+      create: { id: 'singleton', ...body },
+    })
+    return NextResponse.json(settings)
+  } catch (error) {
+    const isMissingColumn =
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022'
+
+    if (isMissingColumn) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is missing the latest settings columns. Run prisma migrate deploy (or redeploy containers) and try again.',
+        },
+        { status: 500 }
+      )
+    }
+
+    console.error('[settings.patch error]', error)
+    return NextResponse.json({ error: 'Failed to save settings.' }, { status: 500 })
+  }
 }

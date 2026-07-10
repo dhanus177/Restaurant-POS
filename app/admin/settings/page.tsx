@@ -96,14 +96,17 @@ export default function SettingsPage() {
         body: JSON.stringify(formData),
       })
 
-      if (!res.ok) throw new Error('Failed to save settings')
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error || 'Failed to save settings')
+      }
 
       const saved = await res.json()
       updateSettings(saved)
       toast.success('Settings saved successfully')
     } catch (error) {
       console.error(error)
-      toast.error('Failed to save settings')
+      toast.error(error instanceof Error ? error.message : 'Failed to save settings')
     } finally {
       setIsSaving(false)
     }
