@@ -490,7 +490,7 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Tip: Add the recipient as <span className="font-mono">whatsapp:+countrycodeNumber</span> and ensure Twilio WhatsApp env vars are configured.
+              Tip: Add the recipient as <span className="font-mono">whatsapp:+countrycodeNumber</span> (or +countrycodeNumber) and configure WhatsApp provider env vars.
             </p>
 
             <Button

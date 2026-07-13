@@ -18,7 +18,10 @@ This project now ships with Docker-based production release paths that work on b
 2. Set these values before first production run:
    - `LICENSE_ACTIVATION_KEYS`
    - `POSTGRES_PASSWORD`
-  - (Optional for WhatsApp reports) `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`, `WHATSAPP_REPORTS_SCHEDULER_TOKEN`
+  - (Optional for WhatsApp reports)
+    - Meta (recommended): `WHATSAPP_PROVIDER=meta`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`
+    - Twilio (optional): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`
+    - Scheduler auth: `WHATSAPP_REPORTS_SCHEDULER_TOKEN`
 3. For HTTPS stack also set:
   - `APP_DOMAIN` (public DNS name pointing to VPS)
   - `LETSENCRYPT_EMAIL`
@@ -132,6 +135,11 @@ To auto-send breakfast/lunch/dinner reports, configure WhatsApp values in `.env`
 
 - `POST /api/whatsapp-reports/schedule`
 - Header: `x-scheduler-token: <WHATSAPP_REPORTS_SCHEDULER_TOKEN>`
+
+Provider notes:
+
+- Use `WHATSAPP_PROVIDER=meta` if you do not want Twilio.
+- In `auto` mode, app will use Meta first, then Twilio if Meta config is missing.
 
 Example Linux cron (every minute):
 

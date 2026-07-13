@@ -39,6 +39,12 @@ function normalizePhone(value: string) {
   return trimmed.startsWith('whatsapp:') ? trimmed : `whatsapp:${trimmed}`
 }
 
+function normalizeMetaRecipient(value: string) {
+  const raw = value.replace(/^whatsapp:/i, '').trim()
+  const digits = raw.replace(/[^\d]/g, '')
+  return digits
+}
+
 function normalizeTime(value: string | null | undefined, fallback: string) {
   const source = (value ?? '').trim()
   const matched = source.match(/^(\d{2}):(\d{2})$/)
@@ -212,6 +218,86 @@ async function sendTwilioWhatsAppMessage(to: string, body: string) {
   return data?.sid
 }
 
+function hasMetaConfig() {
+  return Boolean(
+    process.env.WHATSAPP_ACCESS_TOKEN &&
+      process.env.WHATSAPP_PHONE_NUMBER_ID
+  )
+}
+
+function hasTwilioConfig() {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_WHATSAPP_FROM
+  )
+}
+
+async function sendMetaWhatsAppMessage(to: string, body: string) {
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+
+  if (!accessToken || !phoneNumberId) {
+    throw new Error('Meta WhatsApp env vars are missing (WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID).')
+  }
+
+  const normalizedTo = normalizeMetaRecipient(to)
+  if (!normalizedTo) {
+    throw new Error('Recipient phone number is invalid for WhatsApp Cloud API.')
+  }
+
+  const endpoint = `https://graph.facebook.com/v20.0/${phoneNumberId}/messages`
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: normalizedTo,
+      type: 'text',
+      text: { body },
+    }),
+    cache: 'no-store',
+  })
+
+  const data = (await response.json().catch(() => null)) as
+    | { messages?: Array<{ id?: string }>; error?: { message?: string } }
+    | null
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `WhatsApp Cloud API request failed (${response.status})`)
+  }
+
+  return data?.messages?.[0]?.id
+}
+
+async function sendWhatsAppMessage(to: string, body: string) {
+  const provider = (process.env.WHATSAPP_PROVIDER || 'auto').toLowerCase()
+
+  if (provider === 'meta') {
+    return sendMetaWhatsAppMessage(to, body)
+  }
+
+  if (provider === 'twilio') {
+    return sendTwilioWhatsAppMessage(to, body)
+  }
+
+  // auto mode: prefer Meta, then fallback to Twilio
+  if (hasMetaConfig()) {
+    return sendMetaWhatsAppMessage(to, body)
+  }
+
+  if (hasTwilioConfig()) {
+    return sendTwilioWhatsAppMessage(to, body)
+  }
+
+  throw new Error(
+    'WhatsApp provider config missing. Set Meta vars (WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID) or Twilio vars.'
+  )
+}
+
 export async function runWhatsAppReportScheduler(input?: { force?: boolean; meal?: MealType }) {
   const force = input?.force === true
   const targetMeal = input?.meal
@@ -277,7 +363,7 @@ export async function runWhatsAppReportScheduler(input?: { force?: boolean; meal
         summary,
       })
 
-      const messageSid = await sendTwilioWhatsAppMessage(recipient, message)
+      const messageSid = await sendWhatsAppMessage(recipient, message)
 
       await prisma.whatsAppReportDispatch.create({
         data: {
