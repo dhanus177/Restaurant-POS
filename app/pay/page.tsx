@@ -16,6 +16,21 @@ import type { Order, Shift } from '@/lib/types'
 import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check, DollarSign, Wallet, HandCoins, BadgeDollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
+function groupChairSummary(order: Order) {
+  const chairMap = new Map<number, { chairNumber: number; itemCount: number; itemTotal: number }>()
+
+  for (const item of order.items) {
+    const chairNumber = item.chairNumber ?? 0
+    const current = chairMap.get(chairNumber) ?? { chairNumber, itemCount: 0, itemTotal: 0 }
+    const lineTotal = (item.price + item.modifiers.reduce((sum, modifier) => sum + modifier.price, 0)) * item.quantity
+    current.itemCount += item.quantity
+    current.itemTotal += lineTotal
+    chairMap.set(chairNumber, current)
+  }
+
+  return [...chairMap.values()].sort((a, b) => a.chairNumber - b.chairNumber)
+}
+
 const LKR_DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const
 
 const initialDenominationState = LKR_DENOMINATIONS.reduce<Record<string, string>>((acc, value) => {
@@ -368,6 +383,7 @@ export default function PayPage() {
           <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((order) => {
               const billCode = generateBillCode(order.orderNumber, order.createdAt)
+              const chairSummary = groupChairSummary(order)
               return (
                 <Card key={order.id} className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
                   <CardHeader className="bg-emerald-50/70 pb-2 dark:bg-card/70">
@@ -386,6 +402,14 @@ export default function PayPage() {
                         Customer: {order.customerName}{order.customerPhone ? ` • ${order.customerPhone}` : ''}
                       </div>
                     )}
+                    <div className="flex flex-wrap gap-2">
+                      {chairSummary.map((chair) => (
+                        <Badge key={`${order.id}-chair-${chair.chairNumber}`} variant="outline" className="gap-1">
+                          {chair.chairNumber > 0 ? `Chair ${chair.chairNumber}` : 'Unassigned'}
+                          <span className="text-[10px] opacity-70">{chair.itemCount} item{chair.itemCount === 1 ? '' : 's'}</span>
+                        </Badge>
+                      ))}
+                    </div>
                     <div className="rounded-xl bg-emerald-50 p-4 dark:bg-muted/30">
                       <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Amount due</p>
                       <div className="mt-1 text-3xl font-black text-foreground">{settings.currencySymbol}{order.total.toFixed(2)}</div>

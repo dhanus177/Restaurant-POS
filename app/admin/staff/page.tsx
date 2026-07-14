@@ -60,6 +60,7 @@ export default function StaffManagementPage() {
           { value: 'kitchen', label: 'Kitchen' },
           { value: 'pay-counter', label: 'Pay Counter' },
           { value: 'takeaway', label: 'Takeaway' },
+          { value: 'waiter', label: 'Waiter' },
         ]
       : [
           { value: 'admin', label: 'Admin' },
@@ -67,6 +68,7 @@ export default function StaffManagementPage() {
           { value: 'kitchen', label: 'Kitchen' },
           { value: 'pay-counter', label: 'Pay Counter' },
           { value: 'takeaway', label: 'Takeaway' },
+          { value: 'waiter', label: 'Waiter' },
         ]),
     [canManageSuperAdmins]
   )
@@ -181,6 +183,8 @@ export default function StaffManagementPage() {
         return 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
       case 'takeaway':
         return 'bg-orange-600 text-white dark:bg-orange-500 dark:text-slate-950'
+      case 'waiter':
+        return 'bg-sky-600 text-white dark:bg-sky-500 dark:text-slate-950'
       default:
         return ''
     }

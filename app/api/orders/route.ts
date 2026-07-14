@@ -37,6 +37,7 @@ export async function POST(req: Request) {
           price: item.price,
           modifiers: item.modifiers ?? [],
           notes: item.notes ?? null,
+            chairNumber: item.chairNumber ?? null,
         })),
       },
     },

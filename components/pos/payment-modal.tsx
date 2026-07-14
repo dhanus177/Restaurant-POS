@@ -11,7 +11,7 @@ import { usePOSStore } from '@/lib/store'
 import { Banknote, CreditCard, CheckCircle2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Order, PaymentMethod } from '@/lib/types'
-import { printReceipt } from '@/lib/print'
+import { printReceipt, printTakeawayDocket } from '@/lib/print'
 
 interface PaymentModalProps {
   open: boolean
@@ -21,6 +21,22 @@ interface PaymentModalProps {
 }
 
 const quickCashAmounts = [5, 10, 20, 50, 100]
+
+function groupChairSummary(order: Order | undefined) {
+  if (!order) return []
+
+  const chairMap = new Map<number, { chairNumber: number; itemCount: number; lineTotal: number }>()
+
+  for (const item of order.items) {
+    const chairNumber = item.chairNumber ?? 0
+    const current = chairMap.get(chairNumber) ?? { chairNumber, itemCount: 0, lineTotal: 0 }
+    current.itemCount += item.quantity
+    current.lineTotal += (item.price + item.modifiers.reduce((sum, modifier) => sum + modifier.price, 0)) * item.quantity
+    chairMap.set(chairNumber, current)
+  }
+
+  return [...chairMap.values()].sort((a, b) => a.chairNumber - b.chairNumber)
+}
 
 export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalProps) {
   const {
@@ -48,6 +64,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
   const total = order?.total ?? cartTotals.total
   const cashAmount = parseFloat(cashReceived) || 0
   const change = cashAmount - total
+  const chairSummary = groupChairSummary(order)
 
   const handlePayment = async () => {
     if (paymentMethod === 'cash' && cashAmount < total) {
@@ -65,6 +82,16 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
       setCompletedOrder({ ...order, paymentMethod, paymentStatus: 'paid' })
       setIsComplete(true)
       setIsProcessing(false)
+      if (!order.tableId) {
+        printTakeawayDocket(
+          {
+            ...order,
+            paymentMethod,
+            paymentStatus: 'paid',
+          },
+          settings
+        )
+      }
       toast.success(`Bill #${order.orderNumber} paid successfully!`)
       return
     }
@@ -193,6 +220,30 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
                 <span className="text-primary">{settings.currencySymbol}{total.toFixed(2)}</span>
               </div>
             </div>
+
+            {chairSummary.length > 0 && (
+              <div className="mb-6 rounded-lg border bg-background p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Chair split</p>
+                    <p className="text-sm font-semibold text-foreground">Items grouped by chair</p>
+                  </div>
+                  <Badge variant="secondary">{chairSummary.length} group{chairSummary.length === 1 ? '' : 's'}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {chairSummary.map((chair) => (
+                    <div key={`${order?.id ?? 'order'}-chair-${chair.chairNumber}`} className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
+                      <span className="font-medium text-foreground">
+                        {chair.chairNumber > 0 ? `Chair ${chair.chairNumber}` : 'Unassigned'}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {chair.itemCount} item{chair.itemCount === 1 ? '' : 's'} • {settings.currencySymbol}{chair.lineTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Payment Method Tabs */}
             <Tabs value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>

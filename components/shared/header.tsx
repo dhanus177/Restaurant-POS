@@ -24,6 +24,7 @@ export function Header({ title }: HeaderProps) {
   const { currentUser, settings, logout } = usePOSStore()
   const canAccessKitchen = settings.kitchenPageEnabled !== false || currentUser?.role === 'super-admin'
   const canAccessTakeaway = settings.takeawayPageEnabled !== false || currentUser?.role === 'super-admin'
+  const canAccessWaiter = currentUser?.role === 'waiter' || ['admin', 'super-admin'].includes(currentUser?.role ?? '')
 
   const handleLogout = async () => {
     await logout()
@@ -53,6 +54,8 @@ export function Header({ title }: HeaderProps) {
         return 'bg-emerald-600'
       case 'takeaway':
         return 'bg-orange-600'
+      case 'waiter':
+        return 'bg-sky-600'
       default:
         return 'bg-muted'
     }
@@ -77,6 +80,14 @@ export function Header({ title }: HeaderProps) {
                 POS
               </Link>
             </Button>
+            {canAccessWaiter && (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/waiter" className="gap-2">
+                  <User className="h-4 w-4" />
+                  Waiter
+                </Link>
+              </Button>
+            )}
             {canAccessKitchen && (
               <Button variant="ghost" size="sm" asChild>
                 <Link href="/kitchen" className="gap-2">
@@ -155,6 +166,14 @@ export function Header({ title }: HeaderProps) {
                   POS Terminal
                 </Link>
               </DropdownMenuItem>
+              {canAccessWaiter && (
+                <DropdownMenuItem asChild>
+                  <Link href="/waiter" className="gap-2">
+                    <User className="h-4 w-4" />
+                    Waiter POS
+                  </Link>
+                </DropdownMenuItem>
+              )}
               {canAccessKitchen && (['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'kitchen') && (
                 <DropdownMenuItem asChild>
                   <Link href="/kitchen" className="gap-2">

@@ -118,7 +118,7 @@ interface POSStore {
   removeFromCart: (itemId: string) => void
   updateCartItemQuantity: (itemId: string, quantity: number) => void
   updateCartItemNotes: (itemId: string, notes: string) => void
-  clearCart: () => void
+  clearCart: (options?: { keepTable?: boolean; keepCustomer?: boolean; keepCustomerCount?: boolean }) => void
   setSelectedTable: (table: Table | null) => void
   setCurrentCustomerCount: (count: number) => void
 
@@ -392,6 +392,7 @@ const response = await apiFetch('/api/auth/me', {
           const existingIndex = state.cart.findIndex(
             (i) =>
               i.menuItemId === item.menuItemId &&
+              i.chairNumber === item.chairNumber &&
               JSON.stringify(i.modifiers) === JSON.stringify(item.modifiers)
           )
           if (existingIndex >= 0) {
@@ -420,7 +421,12 @@ const response = await apiFetch('/api/auth/me', {
             i.id === itemId ? { ...i, notes } : i
           ),
         })),
-      clearCart: () => set({ cart: [], selectedTable: null, selectedCustomer: null, currentCustomerCount: 1 }),
+      clearCart: (options: { keepTable?: boolean; keepCustomer?: boolean; keepCustomerCount?: boolean } = {}) => set((state) => ({
+        cart: [],
+        selectedTable: options?.keepTable ? state.selectedTable : null,
+        selectedCustomer: options?.keepCustomer ? state.selectedCustomer : null,
+        currentCustomerCount: options?.keepCustomerCount ? state.currentCustomerCount : 1,
+      })),
       setSelectedTable: (table) => set({ selectedTable: table }),
       setCurrentCustomerCount: (count) => set({ currentCustomerCount: Math.max(1, count) }),
 

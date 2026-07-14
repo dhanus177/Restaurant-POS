@@ -8,7 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UtensilsCrossed, ChefHat, Settings, Lock, Delete, WalletCards, ShoppingBag } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Settings, Lock, Delete, WalletCards, ShoppingBag, User } from 'lucide-react'
 
 type SetupStatus = {
   hasSettings: boolean
@@ -89,6 +89,9 @@ export default function LoginPage() {
       case 'takeaway':
         router.push('/takeaway')
         break
+      case 'waiter':
+        router.push('/waiter')
+        break
       default:
         router.push('/pos')
         break
@@ -129,7 +132,7 @@ export default function LoginPage() {
     setError('')
   }
 
-  const handleQuickLogin = async (role: 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'pay-counter' | 'takeaway') => {
+  const handleQuickLogin = async (role: 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'pay-counter' | 'takeaway' | 'waiter') => {
     if (isMobile && !['cashier', 'super-admin'].includes(role)) {
       setError('Mobile login is allowed only for Super Admin and Cashier roles')
       return
@@ -142,6 +145,7 @@ export default function LoginPage() {
       'super-admin': '2111',
       'pay-counter': '5555',
       takeaway: '6666',
+      waiter: '7777',
     }
     const user = await loginWithPin(pins[role])
     if (user) {
@@ -327,6 +331,16 @@ export default function LoginPage() {
             >
               <ShoppingBag className="h-5 w-5" />
               Takeaway Counter
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => handleQuickLogin('waiter')}
+              disabled={isMobile}
+            >
+              <User className="h-5 w-5" />
+              Waiter
             </Button>
           </div>
         </div>

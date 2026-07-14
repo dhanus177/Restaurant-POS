@@ -266,6 +266,11 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">{item.name}</p>
+                    {typeof item.chairNumber === 'number' && (
+                      <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground mt-0.5">
+                        Chair {item.chairNumber}
+                      </p>
+                    )}
                     {item.modifiers.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         + {item.modifiers.map(m => m.name).join(', ')}

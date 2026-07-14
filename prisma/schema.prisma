@@ -113,6 +113,7 @@ model OrderItem {
   price      Float
   modifiers  Json   @default("[]")
   notes      String?
+  chairNumber Int?
 }
 
 model Supplier {

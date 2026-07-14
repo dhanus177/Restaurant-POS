@@ -1,5 +1,5 @@
 // User & Roles
-export type Role = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway'
+export type Role = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway' | 'waiter'
 
 export interface User {
   id: string
@@ -84,6 +84,7 @@ export interface OrderItem {
   modifiers: SelectedModifier[]
   notes?: string
   serviceChargeApplicable?: boolean
+  chairNumber?: number
 }
 
 export interface Order {

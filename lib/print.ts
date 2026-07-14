@@ -67,6 +67,7 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
     <tr>
       <td style="text-align: left; padding: 4px 0;">
         ${item.quantity}x ${item.name}
+        ${item.chairNumber ? `<br><small style="color: #666;">Chair ${item.chairNumber}</small>` : ''}
         ${item.modifiers.length > 0 ? `<br><small style="color: #666;">${item.modifiers.map(m => m.name).join(', ')}</small>` : ''}
         ${item.notes ? `<br><small style="color: #666; font-style: italic;">Note: ${item.notes}</small>` : ''}
       </td>
@@ -158,6 +159,7 @@ export function generateKitchenDocketHTML(order: Order, settings: Settings): str
     <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
       <div style="font-size: 20px; font-weight: bold;">
         ${item.quantity}x ${item.name}
+        ${item.chairNumber ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">Chair ${item.chairNumber}</div>` : ''}
       </div>
       ${item.modifiers.length > 0 ? `<div style="font-size: 16px; margin-top: 5px; color: #333;">+ ${item.modifiers.map(m => m.name).join(', ')}</div>` : ''}
       ${item.notes ? `<div style="font-size: 16px; margin-top: 5px; color: #c00; font-weight: bold;">** ${item.notes} **</div>` : ''}
@@ -197,6 +199,52 @@ export function generateKitchenDocketHTML(order: Order, settings: Settings): str
   `
 }
 
+export function generateTakeawayDocketHTML(order: Order, settings: Settings): string {
+  const billCode = generateBillCode(order.orderNumber, order.createdAt)
+  const itemsHTML = order.items
+    .map(
+      (item) => `
+    <div style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
+      <div style="font-size: 18px; font-weight: 700;">${item.quantity}x ${item.name}</div>
+      ${item.chairNumber ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">Chair ${item.chairNumber}</div>` : ''}
+      ${item.modifiers.length > 0 ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">+ ${item.modifiers.map((m) => m.name).join(', ')}</div>` : ''}
+      ${item.notes ? `<div style="font-size: 14px; margin-top: 4px; color: #b00020; font-weight: 600;">Note: ${item.notes}</div>` : ''}
+    </div>
+  `
+    )
+    .join('')
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Takeaway Docket #${order.orderNumber}</title>
+      <style>
+        body { font-family: 'Arial', sans-serif; width: 300px; margin: 0 auto; padding: 16px; }
+        .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .restaurant { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+        .order { font-size: 34px; font-weight: 800; line-height: 1.1; }
+        .meta { font-size: 13px; color: #444; margin-top: 4px; }
+        .bill { font-size: 13px; font-weight: 700; margin-top: 4px; }
+        .section-title { margin-top: 10px; margin-bottom: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="restaurant">${settings.restaurantName}</div>
+        <div class="order">#${order.orderNumber}</div>
+        <div class="meta">TAKEAWAY · ${formatDateTime(order.createdAt)}</div>
+        <div class="bill">Bill No: ${billCode}</div>
+        <div class="bill">Order Details</div>
+      </div>
+
+      <div class="section-title">Order Details</div>
+      ${itemsHTML}
+    </body>
+    </html>
+  `
+}
+
 export function printDocument(html: string): void {
   const printWindow = window.open('', '_blank', 'width=400,height=600')
   if (printWindow) {
@@ -217,6 +265,11 @@ export function printReceipt(order: Order, settings: Settings): void {
 
 export function printKitchenDocket(order: Order, settings: Settings): void {
   const html = generateKitchenDocketHTML(order, settings)
+  printDocument(html)
+}
+
+export function printTakeawayDocket(order: Order, settings: Settings): void {
+  const html = generateTakeawayDocketHTML(order, settings)
   printDocument(html)
 }
 

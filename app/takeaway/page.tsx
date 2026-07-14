@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { generateBillCode } from '@/lib/print'
+import { generateBillCode, printTakeawayDocket } from '@/lib/print'
 import { Check, Search, ShoppingBag, ReceiptText, ScanBarcode } from 'lucide-react'
 
 export default function TakeawayPage() {
@@ -17,6 +17,7 @@ export default function TakeawayPage() {
   const [mounted, setMounted] = useState(false)
   const [query, setQuery] = useState('')
   const [scanCode, setScanCode] = useState('')
+  const [selectedPendingBillId, setSelectedPendingBillId] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -80,6 +81,14 @@ export default function TakeawayPage() {
   const handleCompleteTakeaway = (orderId: string, orderNumber: number) => {
     if (!confirm(`Mark takeaway order #${orderNumber} as completed?`)) return
     updateOrderStatus(orderId, 'completed')
+  }
+
+  const handleSelectTakeawayBill = (orderId: string) => {
+    const selectedOrder = pendingTakeawayOrders.find((order) => order.id === orderId)
+    if (!selectedOrder) return
+
+    setSelectedPendingBillId(orderId)
+    printTakeawayDocket(selectedOrder, settings)
   }
 
   if (!mounted || !currentUser || !['admin', 'super-admin', 'takeaway'].includes(currentUser.role)) {
@@ -194,7 +203,11 @@ export default function TakeawayPage() {
             {filtered.map((order) => {
               const billCode = generateBillCode(order.orderNumber, order.createdAt)
               return (
-                <Card key={order.id} className="border-orange-200 shadow-sm dark:border-orange-900/40">
+                <Card
+                  key={order.id}
+                  className={`cursor-pointer border-orange-200 shadow-sm transition hover:shadow-md dark:border-orange-900/40 ${selectedPendingBillId === order.id ? 'ring-2 ring-orange-500' : ''}`}
+                  onClick={() => handleSelectTakeawayBill(order.id)}
+                >
                   <CardHeader className="bg-orange-50/70 pb-2 dark:bg-card/70">
                     <CardTitle className="flex items-center justify-between text-lg">
                       <span>#{order.orderNumber}</span>
@@ -213,6 +226,16 @@ export default function TakeawayPage() {
                     <div className="rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
                       Payment handled at pay counter.
                     </div>
+                    <Button
+                      className="h-10 w-full"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSelectTakeawayBill(order.id)
+                      }}
+                    >
+                      Select Bill & Print Docket
+                    </Button>
                   </CardContent>
                 </Card>
               )
