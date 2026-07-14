@@ -139,6 +139,7 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
       <div class="divider"></div>
       
       <p>Payment: ${order.paymentMethod?.toUpperCase() || 'PENDING'}</p>
+      ${order.paymentCollectedBy ? `<p>Collected By: <strong>${order.paymentCollectedBy}</strong></p>` : ''}
       <p>Bill Code: <strong>${billCode}</strong></p>
       <div style="margin-top:8px; text-align:center;">
         ${generateBarcodeSVG(billCode)}

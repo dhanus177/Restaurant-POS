@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
 
-  const actor = await requireRole(req, ['admin', 'super-admin'])
+  const actor = await requireRole(req, ['admin', 'super-admin', 'pay-counter'])
   if (!actor.ok) return actor.response
 
   const { id } = await params

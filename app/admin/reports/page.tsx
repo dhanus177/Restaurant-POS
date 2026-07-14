@@ -227,6 +227,7 @@ export default function ReportsPage() {
           order.orderNumber,
           order.paymentStatus,
           order.paymentMethod || 'pending',
+          order.paymentCollectedBy || 'Not recorded',
           order.tableName || 'Takeaway',
           order.status,
           itemCount,
@@ -256,6 +257,7 @@ export default function ReportsPage() {
         'Order #',
         'Payment Status',
         'Payment Method',
+        'Collected By',
         'Table',
         'Order Status',
         'Items Count',
@@ -294,6 +296,7 @@ export default function ReportsPage() {
           <td>${sanitizeHtml(order.orderNumber)}</td>
           <td>${sanitizeHtml(order.paymentStatus)}</td>
           <td>${sanitizeHtml(order.paymentMethod || 'pending')}</td>
+          <td>${sanitizeHtml(order.paymentCollectedBy || 'Not recorded')}</td>
           <td>${sanitizeHtml(order.tableName || 'Takeaway')}</td>
           <td>${sanitizeHtml(order.status)}</td>
           <td>${sanitizeHtml(order.items.reduce((sum, item) => sum + item.quantity, 0))}</td>
@@ -324,7 +327,7 @@ export default function ReportsPage() {
     <table>
       <thead>
         <tr>
-          <th>Order #</th><th>Payment Status</th><th>Payment Method</th><th>Table</th><th>Order Status</th>
+          <th>Order #</th><th>Payment Status</th><th>Payment Method</th><th>Collected By</th><th>Table</th><th>Order Status</th>
           <th>Items Count</th><th>Subtotal</th><th>Service Charge</th><th>Total</th><th>Created At</th><th>Items</th>
         </tr>
       </thead>
@@ -347,10 +350,10 @@ export default function ReportsPage() {
       `Orders: ${totals.orderCount}`,
       `Average Ticket: ${settings.currencySymbol}${totals.avgTicket.toFixed(2)}`,
       '',
-      'Order # | Method | Table | Status | Items | Total',
+      'Order # | Method | Collected By | Table | Status | Items | Total',
       ...filteredReportOrders.map(
         (order) =>
-          `${order.orderNumber} | ${order.paymentMethod || 'pending'} | ${order.tableName || 'Takeaway'} | ${order.paymentStatus} | ${order.items.reduce((sum, item) => sum + item.quantity, 0)} | ${settings.currencySymbol}${order.total.toFixed(2)}`
+          `${order.orderNumber} | ${order.paymentMethod || 'pending'} | ${order.paymentCollectedBy || 'Not recorded'} | ${order.tableName || 'Takeaway'} | ${order.paymentStatus} | ${order.items.reduce((sum, item) => sum + item.quantity, 0)} | ${settings.currencySymbol}${order.total.toFixed(2)}`
       ),
     ]
 
@@ -652,6 +655,7 @@ export default function ReportsPage() {
                     <th className="p-3 text-left">Source</th>
                     <th className="p-3 text-left">Status</th>
                     <th className="p-3 text-left">Payment</th>
+                    <th className="p-3 text-left">Collected By</th>
                     <th className="p-3 text-right">Total</th>
                   </tr>
                 </thead>
@@ -663,6 +667,7 @@ export default function ReportsPage() {
                       <td className="p-3">{order.tableName || 'Takeaway'}</td>
                       <td className="p-3 capitalize">{order.status}</td>
                       <td className="p-3 capitalize">{order.paymentMethod || order.paymentStatus}</td>
+                      <td className="p-3">{order.paymentCollectedBy || 'Not recorded'}</td>
                       <td className="p-3 text-right font-semibold">{settings.currencySymbol}{order.total.toFixed(2)}</td>
                     </tr>
                   ))}

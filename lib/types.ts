@@ -102,6 +102,7 @@ export interface Order {
   status: OrderStatus
   paymentMethod?: PaymentMethod
   paymentStatus: PaymentStatus
+  paymentCollectedBy?: string
   createdAt: string
   updatedAt: string
   createdBy: string

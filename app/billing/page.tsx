@@ -196,6 +196,10 @@ export default function BillingPage() {
                   <span>Order source</span>
                   <span className="text-right">Counter</span>
                 </div>
+                <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <span>Collected by</span>
+                  <span className="text-right">Pending at pay counter</span>
+                </div>
                 <Separator className="my-3" />
                 <div className="flex items-end justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Grand total</span>

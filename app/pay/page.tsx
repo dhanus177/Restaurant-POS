@@ -60,6 +60,7 @@ export default function PayPage() {
   const [scanCode, setScanCode] = useState('')
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [openingBalanceInput, setOpeningBalanceInput] = useState('0')
+  const [openingDenominationCounts, setOpeningDenominationCounts] = useState<Record<string, string>>(initialDenominationState)
   const [countedCashInput, setCountedCashInput] = useState('0')
   const [cashOutAmount, setCashOutAmount] = useState('')
   const [cashOutReason, setCashOutReason] = useState('')
@@ -74,7 +75,7 @@ export default function PayPage() {
   const [isSavingCashOut, setIsSavingCashOut] = useState(false)
   const [isClosingDrawer, setIsClosingDrawer] = useState(false)
   const canReverseBills = currentUser?.role === 'admin' || currentUser?.role === 'super-admin'
-  const canManageDrawer = currentUser?.role === 'admin' || currentUser?.role === 'super-admin'
+  const canManageDrawer = ['admin', 'super-admin', 'pay-counter'].includes(currentUser?.role ?? '')
   const canRecordCashOut = ['admin', 'super-admin', 'pay-counter'].includes(currentUser?.role ?? '')
 
   useEffect(() => {
@@ -135,6 +136,13 @@ export default function PayPage() {
     }, 0)
   }, [denominationCounts])
 
+  const openingDenominationTotal = useMemo(() => {
+    return LKR_DENOMINATIONS.reduce((sum, denomination) => {
+      const count = Number(openingDenominationCounts[String(denomination)] || 0)
+      return sum + (Number.isFinite(count) ? count : 0) * denomination
+    }, 0)
+  }, [openingDenominationCounts])
+
   useEffect(() => {
     if (denominationTotal > 0) {
       setCountedCashInput(denominationTotal.toFixed(2))
@@ -143,6 +151,15 @@ export default function PayPage() {
 
     setCountedCashInput(drawerBalance.currentBalance.toFixed(2))
   }, [drawerBalance.currentBalance, denominationTotal])
+
+  useEffect(() => {
+    if (openingDenominationTotal > 0) {
+      setOpeningBalanceInput(openingDenominationTotal.toFixed(2))
+      return
+    }
+
+    setOpeningBalanceInput(String(cashDrawer?.openingBalance ?? 0))
+  }, [cashDrawer?.openingBalance, openingDenominationTotal])
 
   const loadCurrentShift = async () => {
     try {
@@ -157,7 +174,7 @@ export default function PayPage() {
 
   const handleSaveCashDrawer = async () => {
     if (!canManageDrawer) {
-      toast.error('Only admin and super-admin can change cash drawer balance')
+      toast.error('Only admin, super-admin, and pay-counter can change cash drawer balance')
       return
     }
 
@@ -169,8 +186,9 @@ export default function PayPage() {
 
     setIsSavingDrawer(true)
     try {
+      const nextOpeningBalance = openingDenominationTotal > 0 ? openingDenominationTotal : openingBalance
       updateCashDrawer({
-        openingBalance,
+        openingBalance: nextOpeningBalance,
         notes: drawerNotes.trim() || null,
         openedAt: new Date().toISOString(),
       })
@@ -180,7 +198,7 @@ export default function PayPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            openingFloat: openingBalance,
+            openingFloat: nextOpeningBalance,
             notes: drawerNotes.trim() || null,
           }),
         })
@@ -188,14 +206,16 @@ export default function PayPage() {
         if (shiftRes.ok) {
           const openedShift = (await shiftRes.json()) as Shift
           setCurrentShift(openedShift)
-            setShowDrawerBalanceWindow(false)
-          toast.success('Cash drawer balance saved and shift opened')
+          setOpeningDenominationCounts(initialDenominationState)
+          setShowDrawerBalanceWindow(false)
+          toast.success('Cash drawer balance saved and cash counter shift opened')
           return
         }
       }
 
-        setShowDrawerBalanceWindow(false)
-      toast.success('Cash drawer balance saved')
+      setOpeningDenominationCounts(initialDenominationState)
+      setShowDrawerBalanceWindow(false)
+      toast.success(currentShift ? 'Cash drawer balance saved' : 'Cash drawer balance saved and shift opened')
     } finally {
       setIsSavingDrawer(false)
     }
@@ -244,7 +264,7 @@ export default function PayPage() {
 
   const handleCloseCashDrawer = async () => {
     if (!canManageDrawer) {
-      toast.error('Only admin and super-admin can close the cash drawer')
+      toast.error('Only admin, super-admin, and pay-counter can close the cash drawer')
       return
     }
 
@@ -519,7 +539,7 @@ export default function PayPage() {
                     onClick={() => setShowDrawerBalanceWindow(true)}
                   >
                     <Wallet className="h-4 w-4" />
-                    Cash Drawer Balance
+                    {currentShift ? 'Balance Counter' : 'Open Cash Counter Shift'}
                   </Button>
                 </div>
               ) : (
@@ -537,7 +557,7 @@ export default function PayPage() {
                       <p>Opened at: <span className="font-medium text-foreground">{new Date(currentShift.openedAt).toLocaleString()}</span></p>
                     </>
                   ) : (
-                    <p className="mt-1">No open shift. Use <span className="font-medium text-foreground">Set / Reset Drawer Balance</span> to open a shift first.</p>
+                      <p className="mt-1">No open shift. Use <span className="font-medium text-foreground">Open Cash Counter Shift</span> to start the first counter shift for the day.</p>
                   )}
                 </div>
 
@@ -626,6 +646,9 @@ export default function PayPage() {
                       {order.customerName && (
                         <div className="text-xs text-muted-foreground">Customer: {order.customerName}</div>
                       )}
+                      <div className="text-xs text-muted-foreground">
+                        Collected By: {order.paymentCollectedBy || 'Not recorded'}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       {!order.tableId && order.status !== 'completed' && order.status !== 'cancelled' && (
@@ -662,6 +685,38 @@ export default function PayPage() {
               <p>Shift: {currentShift ? currentShift.id.slice(0, 8) : 'Not opened yet'}</p>
             </div>
 
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Counter opening denominations</p>
+                <Badge variant="secondary">{settings.currencySymbol}{openingDenominationTotal.toFixed(2)}</Badge>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {LKR_DENOMINATIONS.map((denomination) => (
+                  <div key={denomination} className="grid grid-cols-[1fr_1fr] items-center gap-2">
+                    <label className="text-xs text-muted-foreground" htmlFor={`opening-denom-${denomination}`}>
+                      {settings.currencySymbol}{denomination}
+                    </label>
+                    <Input
+                      id={`opening-denom-${denomination}`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={openingDenominationCounts[String(denomination)]}
+                      onChange={(e) =>
+                        setOpeningDenominationCounts((current) => ({
+                          ...current,
+                          [String(denomination)]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Count the notes/coins available when opening the cash counter. This becomes the opening float for the first shift.
+              </p>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground" htmlFor="opening-balance-dialog">Opening balance</label>
@@ -671,8 +726,14 @@ export default function PayPage() {
                   min="0"
                   step="0.01"
                   value={openingBalanceInput}
-                  onChange={(e) => setOpeningBalanceInput(e.target.value)}
+                  onChange={(e) => {
+                    setOpeningDenominationCounts(initialDenominationState)
+                    setOpeningBalanceInput(e.target.value)
+                  }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Manual total is used only when no denominations are counted.
+                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground" htmlFor="drawer-notes-dialog">Notes</label>
@@ -691,7 +752,7 @@ export default function PayPage() {
               Cancel
             </Button>
             <Button onClick={() => void handleSaveCashDrawer()} disabled={isSavingDrawer || !canManageDrawer}>
-              {isSavingDrawer ? 'Saving...' : 'Set / Reset Drawer Balance'}
+                {isSavingDrawer ? 'Saving...' : currentShift ? 'Save Counter Balance' : 'Open Cash Counter Shift'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -748,12 +809,12 @@ export default function PayPage() {
         <DialogContent className="w-[95vw] max-w-3xl">
           <DialogHeader>
             <DialogTitle>Denomination Close-out Window</DialogTitle>
-            <DialogDescription>Count the cash by denomination and save the drawer close-out report.</DialogDescription>
+            <DialogDescription>When the shift ends, the counter person can balance the cash and count denominations before closing the shift report.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-3 rounded-md border p-3">
-              <p className="text-sm font-semibold text-foreground">Denominations</p>
+              <p className="text-sm font-semibold text-foreground">Closing denominations</p>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {LKR_DENOMINATIONS.map((denomination) => (
                   <div key={denomination} className="grid grid-cols-[1fr_1fr] items-center gap-2">
@@ -814,7 +875,7 @@ export default function PayPage() {
               Cancel
             </Button>
             <Button onClick={() => void handleCloseCashDrawer()} disabled={isClosingDrawer || !canManageDrawer}>
-              {isClosingDrawer ? 'Closing drawer...' : 'Close Drawer & Save Report'}
+              {isClosingDrawer ? 'Closing drawer...' : 'Close Shift & Save Report'}
             </Button>
           </DialogFooter>
         </DialogContent>

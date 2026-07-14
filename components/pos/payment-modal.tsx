@@ -78,8 +78,8 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
     await new Promise((resolve) => setTimeout(resolve, 1000))
 
     if (order) {
-      updateOrderPayment(order.id, paymentMethod, 'paid')
-      setCompletedOrder({ ...order, paymentMethod, paymentStatus: 'paid' })
+      updateOrderPayment(order.id, paymentMethod, 'paid', currentUser?.name || 'Unknown')
+      setCompletedOrder({ ...order, paymentMethod, paymentStatus: 'paid', paymentCollectedBy: currentUser?.name || 'Unknown' })
       setIsComplete(true)
       setIsProcessing(false)
       if (!order.tableId) {
@@ -88,6 +88,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
             ...order,
             paymentMethod,
             paymentStatus: 'paid',
+            paymentCollectedBy: currentUser?.name || 'Unknown',
           },
           settings
         )
@@ -109,6 +110,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
       status: 'pending',
       paymentMethod,
       paymentStatus: 'paid',
+      paymentCollectedBy: currentUser?.name || 'Unknown',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy: currentUser?.id || 'unknown',

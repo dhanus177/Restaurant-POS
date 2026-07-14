@@ -127,7 +127,7 @@ interface POSStore {
   orderNumber: number
   addOrder: (order: Order) => void
   updateOrderStatus: (id: string, status: OrderStatus) => void
-  updateOrderPayment: (id: string, paymentMethod: Order['paymentMethod'], paymentStatus: Order['paymentStatus']) => void
+  updateOrderPayment: (id: string, paymentMethod: Order['paymentMethod'], paymentStatus: Order['paymentStatus'], paymentCollectedBy?: string) => void
   getNextOrderNumber: () => number
   toggleOrderPriority: (id: string) => void
 
@@ -441,9 +441,9 @@ const response = await apiFetch('/api/auth/me', {
         set((state) => ({ orders: state.orders.map((o) => (o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)) }))
         dbSync('PATCH', `/api/orders/${id}`, { status })
       },
-      updateOrderPayment: (id, paymentMethod, paymentStatus) => {
-        set((state) => ({ orders: state.orders.map((o) => (o.id === id ? { ...o, paymentMethod, paymentStatus, updatedAt: new Date().toISOString() } : o)) }))
-        dbSync('PATCH', `/api/orders/${id}`, { paymentMethod, paymentStatus })
+      updateOrderPayment: (id, paymentMethod, paymentStatus, paymentCollectedBy) => {
+        set((state) => ({ orders: state.orders.map((o) => (o.id === id ? { ...o, paymentMethod, paymentStatus, paymentCollectedBy, updatedAt: new Date().toISOString() } : o)) }))
+        dbSync('PATCH', `/api/orders/${id}`, { paymentMethod, paymentStatus, paymentCollectedBy })
       },
       getNextOrderNumber: () => get().orderNumber,
       toggleOrderPriority: (id) => {
