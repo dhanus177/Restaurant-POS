@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasEffectiveRole, resolveEffectiveRole } from '@/lib/roles'
 import { Header } from '@/components/shared/header'
 import { usePOSStore } from '@/lib/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,14 +30,14 @@ export default function TakeawayPage() {
       return
     }
 
-    if (mounted && currentUser && !['admin', 'super-admin', 'takeaway'].includes(currentUser.role)) {
+    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'takeaway'], settings)) {
       router.push('/pos')
     }
-  }, [currentUser, mounted, router])
+  }, [currentUser, mounted, router, settings])
 
   useEffect(() => {
     if (!mounted || !currentUser) return
-    if (settings.takeawayPageEnabled === false && currentUser.role !== 'super-admin') {
+    if (settings.takeawayPageEnabled === false && resolveEffectiveRole(currentUser.role, settings) !== 'super-admin') {
       router.push('/pos')
     }
   }, [currentUser, mounted, router, settings.takeawayPageEnabled])
@@ -91,7 +92,7 @@ export default function TakeawayPage() {
     printTakeawayDocket(selectedOrder, settings)
   }
 
-  if (!mounted || !currentUser || !['admin', 'super-admin', 'takeaway'].includes(currentUser.role)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'takeaway'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -99,7 +100,7 @@ export default function TakeawayPage() {
     )
   }
 
-  if (settings.takeawayPageEnabled === false && currentUser.role !== 'super-admin') {
+  if (settings.takeawayPageEnabled === false && resolveEffectiveRole(currentUser.role, settings) !== 'super-admin') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center">

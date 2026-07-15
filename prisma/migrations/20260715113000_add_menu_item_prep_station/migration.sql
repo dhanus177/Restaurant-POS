@@ -1,0 +1,2 @@
+ALTER TABLE "MenuItem"
+ADD COLUMN IF NOT EXISTS "prepStation" TEXT NOT NULL DEFAULT 'kitchen';

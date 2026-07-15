@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { apiFetch } from '@/lib/api'
+import { getAllRoleDefinitions, getRoleDisplayName, hasEffectiveRole, resolveEffectiveRole, slugifyRoleName, SYSTEM_ROLE_DEFINITIONS } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,45 +34,38 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Plus, Pencil, Trash2, User } from 'lucide-react'
 import { toast } from 'sonner'
-import type { User as UserType, Role } from '@/lib/types'
+import type { BuiltInRole, Role, RoleDefinition, User as UserType } from '@/lib/types'
 
 export default function StaffManagementPage() {
-  const { users, currentUser, addUser, updateUser, deleteUser, loadFromDB } = usePOSStore()
+  const { users, currentUser, settings, updateSettings, addUser, updateUser, deleteUser, loadFromDB } = usePOSStore()
   const [showForm, setShowForm] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showRoleForm, setShowRoleForm] = useState(false)
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null)
+  const [selectedRole, setSelectedRole] = useState<RoleDefinition | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     pin: '',
     role: 'cashier' as Role,
   })
+  const [roleForm, setRoleForm] = useState({
+    name: '',
+    baseRole: 'cashier' as Exclude<BuiltInRole, 'super-admin'>,
+  })
   const canManageSuperAdmins = currentUser?.role === 'super-admin'
+  const customRoles = settings.customRoles ?? []
+  const roleDefinitions = useMemo(() => getAllRoleDefinitions(settings), [settings])
 
   useEffect(() => {
     void loadFromDB()
   }, [loadFromDB])
 
   const assignableRoles = useMemo(
-    () => (canManageSuperAdmins
-      ? [
-          { value: 'super-admin', label: 'Super Admin' },
-          { value: 'admin', label: 'Admin' },
-          { value: 'cashier', label: 'Cashier' },
-          { value: 'kitchen', label: 'Kitchen' },
-          { value: 'pay-counter', label: 'Pay Counter' },
-          { value: 'takeaway', label: 'Takeaway' },
-          { value: 'waiter', label: 'Waiter' },
-        ]
-      : [
-          { value: 'admin', label: 'Admin' },
-          { value: 'cashier', label: 'Cashier' },
-          { value: 'kitchen', label: 'Kitchen' },
-          { value: 'pay-counter', label: 'Pay Counter' },
-          { value: 'takeaway', label: 'Takeaway' },
-          { value: 'waiter', label: 'Waiter' },
-        ]),
-    [canManageSuperAdmins]
+    () => roleDefinitions
+      .filter((role) => canManageSuperAdmins || role.baseRole !== 'super-admin')
+      .map((role) => ({ value: role.id, label: role.name })),
+    [canManageSuperAdmins, roleDefinitions]
   )
 
   useEffect(() => {
@@ -102,6 +97,108 @@ export default function StaffManagementPage() {
       role: 'cashier',
     })
     setShowForm(true)
+  }
+
+  const handleAddRole = () => {
+    setSelectedRole(null)
+    setRoleForm({
+      name: '',
+      baseRole: 'cashier',
+    })
+    setShowRoleForm(true)
+  }
+
+  const handleEditRole = (role: RoleDefinition) => {
+    setSelectedRole(role)
+    setRoleForm({
+      name: role.name,
+      baseRole: role.baseRole === 'super-admin' ? 'cashier' : role.baseRole,
+    })
+    setShowRoleForm(true)
+  }
+
+  const persistCustomRoles = async (nextRoles: RoleDefinition[]) => {
+    const res = await apiFetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...settings,
+        customRoles: nextRoles,
+      }),
+    })
+
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null
+      throw new Error(payload?.error || 'Failed to save roles')
+    }
+
+    const saved = await res.json()
+    updateSettings(saved)
+  }
+
+  const handleSaveRole = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!canManageSuperAdmins) {
+      toast.error('Only super admin can manage custom roles')
+      return
+    }
+
+    const trimmedName = roleForm.name.trim()
+    if (!trimmedName) {
+      toast.error('Role name is required')
+      return
+    }
+
+    const duplicateName = customRoles.find((role) => role.name.toLowerCase() === trimmedName.toLowerCase() && role.id !== selectedRole?.id)
+    if (duplicateName || SYSTEM_ROLE_DEFINITIONS.some((role) => role.name.toLowerCase() === trimmedName.toLowerCase())) {
+      toast.error('Role name already exists')
+      return
+    }
+
+    const nextRole: RoleDefinition = selectedRole
+      ? { ...selectedRole, name: trimmedName, baseRole: roleForm.baseRole }
+      : {
+          id: `custom-${slugifyRoleName(trimmedName) || 'role'}-${Date.now()}`,
+          name: trimmedName,
+          baseRole: roleForm.baseRole,
+        }
+
+    const nextRoles = selectedRole
+      ? customRoles.map((role) => (role.id === selectedRole.id ? nextRole : role))
+      : [...customRoles, nextRole]
+
+    try {
+      await persistCustomRoles(nextRoles)
+      toast.success(selectedRole ? 'Role updated' : 'Role created')
+      setShowRoleForm(false)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to save role')
+    }
+  }
+
+  const handleDeleteRole = async (role: RoleDefinition) => {
+    if (!canManageSuperAdmins) {
+      toast.error('Only super admin can manage custom roles')
+      return
+    }
+
+    const assignedUsers = users.filter((user) => user.role === role.id)
+    if (assignedUsers.length > 0) {
+      toast.error(`Cannot delete role. It is assigned to ${assignedUsers.length} staff member${assignedUsers.length === 1 ? '' : 's'}.`)
+      return
+    }
+
+    if (!confirm(`Delete role ${role.name}?`)) return
+
+    try {
+      await persistCustomRoles(customRoles.filter((entry) => entry.id !== role.id))
+      toast.success('Role deleted')
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to delete role')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,7 +267,7 @@ export default function StaffManagementPage() {
   }
 
   const getRoleBadgeColor = (role: Role) => {
-    switch (role) {
+    switch (resolveEffectiveRole(role, settings)) {
       case 'super-admin':
         return 'bg-violet-600 text-white'
       case 'admin':
@@ -197,11 +294,52 @@ export default function StaffManagementPage() {
           <h1 className="text-2xl font-bold text-foreground">Staff Management</h1>
           <p className="text-muted-foreground">Manage staff members and their roles</p>
         </div>
-        <Button onClick={handleAdd} className="w-full gap-2 sm:w-auto">
-          <Plus className="h-4 w-4" />
-          Add Staff
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {canManageSuperAdmins && (
+            <Button variant="outline" onClick={handleAddRole} className="w-full gap-2 sm:w-auto">
+              <Plus className="h-4 w-4" />
+              Add Role
+            </Button>
+          )}
+          <Button onClick={handleAdd} className="w-full gap-2 sm:w-auto">
+            <Plus className="h-4 w-4" />
+            Add Staff
+          </Button>
+        </div>
       </div>
+
+      {canManageSuperAdmins && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {customRoles.length === 0 ? (
+            <Card className="lg:col-span-2 xl:col-span-3">
+              <CardContent className="p-4 text-sm text-muted-foreground">
+                No custom roles yet. Create a role and choose which built-in access profile it should inherit.
+              </CardContent>
+            </Card>
+          ) : customRoles.map((role) => (
+            <Card key={role.id}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-foreground">{role.name}</h3>
+                    <p className="text-sm text-muted-foreground">Inherits: {getRoleDisplayName(role.baseRole, settings)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Assigned: {users.filter((user) => user.role === role.id).length}</p>
+                  </div>
+                  <Badge className={getRoleBadgeColor(role.id)}>{getRoleDisplayName(role.id, settings)}</Badge>
+                </div>
+                <div className="mt-4 flex justify-end gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => handleEditRole(role)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => void handleDeleteRole(role)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-end gap-2">
         <Button variant={viewMode === 'cards' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('cards')}>Cards</Button>
@@ -224,7 +362,7 @@ export default function StaffManagementPage() {
                     </div>
                   </div>
                   <Badge className={`w-fit ${getRoleBadgeColor(user.role)}`}>
-                    {user.role}
+                    {getRoleDisplayName(user.role, settings)}
                   </Badge>
                 </div>
                 <div className="flex justify-end gap-1 mt-4">
@@ -261,7 +399,7 @@ export default function StaffManagementPage() {
                 <tr key={user.id} className="border-t">
                   <td className="p-3 font-medium">{user.name}</td>
                   <td className="p-3">{user.pin}</td>
-                  <td className="p-3"><Badge className={getRoleBadgeColor(user.role)}>{user.role}</Badge></td>
+                  <td className="p-3"><Badge className={getRoleBadgeColor(user.role)}>{getRoleDisplayName(user.role, settings)}</Badge></td>
                   <td className="p-3">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(user)}><Pencil className="h-4 w-4" /></Button>
@@ -331,6 +469,51 @@ export default function StaffManagementPage() {
                 Cancel
               </Button>
               <Button type="submit" className="w-full sm:w-auto">{selectedUser ? 'Update' : 'Add'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRoleForm} onOpenChange={setShowRoleForm}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{selectedRole ? 'Edit Role' : 'Create Role'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveRole} className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="role-name">Role Name</Label>
+              <Input
+                id="role-name"
+                value={roleForm.name}
+                onChange={(e) => setRoleForm((current) => ({ ...current, name: e.target.value }))}
+                placeholder="e.g. Floor Supervisor"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="role-base">Access Template</Label>
+              <Select
+                value={roleForm.baseRole}
+                onValueChange={(value) => setRoleForm((current) => ({ ...current, baseRole: value as Exclude<BuiltInRole, 'super-admin'> }))}
+              >
+                <SelectTrigger id="role-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SYSTEM_ROLE_DEFINITIONS.filter((role) => role.baseRole !== 'super-admin').map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Custom roles inherit permissions from the selected built-in role.</p>
+            </div>
+            <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-background pt-4 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowRoleForm(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto">{selectedRole ? 'Update Role' : 'Create Role'}</Button>
             </div>
           </form>
         </DialogContent>

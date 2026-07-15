@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Header } from '@/components/shared/header'
 import { AdminSidebar } from '@/components/admin/sidebar'
@@ -12,7 +13,7 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { currentUser } = usePOSStore()
+  const { currentUser, settings } = usePOSStore()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -22,12 +23,12 @@ export default function AdminLayout({
   useEffect(() => {
     if (mounted && !currentUser) {
       router.push('/')
-    } else if (mounted && !['admin', 'super-admin'].includes(currentUser?.role ?? '')) {
+    } else if (mounted && !hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings)) {
       router.push('/pos')
     }
-  }, [currentUser, mounted, router])
+  }, [currentUser, mounted, router, settings])
 
-  if (!mounted || !currentUser || !['admin', 'super-admin'].includes(currentUser.role)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>

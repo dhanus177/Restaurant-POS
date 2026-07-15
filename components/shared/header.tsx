@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { getRoleDisplayName, hasEffectiveRole, resolveEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -22,9 +23,10 @@ interface HeaderProps {
 export function Header({ title }: HeaderProps) {
   const router = useRouter()
   const { currentUser, settings, logout } = usePOSStore()
-  const canAccessKitchen = settings.kitchenPageEnabled !== false || currentUser?.role === 'super-admin'
-  const canAccessTakeaway = settings.takeawayPageEnabled !== false || currentUser?.role === 'super-admin'
-  const canAccessWaiter = currentUser?.role === 'waiter' || ['admin', 'super-admin'].includes(currentUser?.role ?? '')
+  const effectiveRole = resolveEffectiveRole(currentUser?.role ?? '', settings)
+  const canAccessKitchen = settings.kitchenPageEnabled !== false || effectiveRole === 'super-admin'
+  const canAccessTakeaway = settings.takeawayPageEnabled !== false || effectiveRole === 'super-admin'
+  const canAccessWaiter = hasEffectiveRole(currentUser?.role ?? '', ['waiter', 'admin', 'super-admin'], settings)
 
   const handleLogout = async () => {
     await logout()
@@ -41,7 +43,7 @@ export function Header({ title }: HeaderProps) {
   }
 
   const getRoleBadgeColor = (role: string) => {
-    switch (role) {
+    switch (resolveEffectiveRole(role, settings)) {
       case 'super-admin':
         return 'bg-violet-600'
       case 'admin':
@@ -72,7 +74,7 @@ export function Header({ title }: HeaderProps) {
 
       <div className="flex items-center gap-2">
         {/* Quick Navigation for Admin */}
-        {['admin', 'super-admin'].includes(currentUser?.role ?? '') && (
+        {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings) && (
           <nav className="hidden md:flex items-center gap-1 mr-4">
             <Button variant="ghost" size="sm" asChild>
               <Link href="/pos" className="gap-2">
@@ -152,7 +154,7 @@ export function Header({ title }: HeaderProps) {
               <div className="flex flex-col">
                 <span>{currentUser?.name}</span>
                 <span className="text-xs text-muted-foreground capitalize">
-                  {currentUser?.role}
+                  {currentUser ? getRoleDisplayName(currentUser.role, settings) : 'Guest'}
                 </span>
               </div>
             </DropdownMenuLabel>
@@ -174,7 +176,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {canAccessKitchen && (['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'kitchen') && (
+              {canAccessKitchen && hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'kitchen'], settings) && (
                 <DropdownMenuItem asChild>
                   <Link href="/kitchen" className="gap-2">
                     <ChefHat className="h-4 w-4" />
@@ -182,7 +184,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {(['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter') && (
+              {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings) && (
                 <DropdownMenuItem asChild>
                   <Link href="/pay" className="gap-2">
                     <WalletCards className="h-4 w-4" />
@@ -190,7 +192,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {canAccessTakeaway && (['admin', 'super-admin'].includes(currentUser?.role ?? '') || currentUser?.role === 'pay-counter' || currentUser?.role === 'cashier' || currentUser?.role === 'takeaway') && (
+              {canAccessTakeaway && hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter', 'cashier', 'takeaway'], settings) && (
                 <DropdownMenuItem asChild>
                   <Link href="/takeaway" className="gap-2">
                     <ShoppingBag className="h-4 w-4" />
@@ -198,7 +200,7 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {['admin', 'super-admin'].includes(currentUser?.role ?? '') && (
+              {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings) && (
                 <>
                   <DropdownMenuItem asChild>
                     <Link href="/inventory" className="gap-2">

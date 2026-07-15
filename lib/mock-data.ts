@@ -61,6 +61,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Herb-marinated grilled chicken with seasonal vegetables',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
     modifierGroups: [
       {
         id: 'mg-1',
@@ -84,6 +85,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Pan-seared Atlantic salmon with lemon butter sauce',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
     modifierGroups: [
       {
         id: 'mg-2',
@@ -105,6 +107,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Premium ribeye steak cooked to perfection',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
     modifierGroups: [
       {
         id: 'mg-3',
@@ -139,6 +142,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Creamy bacon pasta with parmesan',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
   },
   // Burgers
   {
@@ -149,6 +153,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Beef patty with lettuce, tomato, and special sauce',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
     modifierGroups: [
       {
         id: 'mg-5',
@@ -173,6 +178,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Crispy chicken fillet with mayo and lettuce',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
   },
   {
     id: 'item-7',
@@ -182,6 +188,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Plant-based patty with fresh vegetables',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
   },
   {
     id: 'item-8',
@@ -191,6 +198,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Beef patty with BBQ sauce, bacon, and onion rings',
     isAvailable: false,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
   },
   // Sides
   {
@@ -200,6 +208,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-3',
     description: 'Crispy golden fries',
     isAvailable: true,
+    prepStation: 'kitchen',
     modifierGroups: [
       {
         id: 'mg-6',
@@ -219,6 +228,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-3',
     description: 'Crispy battered onion rings',
     isAvailable: true,
+    prepStation: 'kitchen',
   },
   {
     id: 'item-11',
@@ -227,6 +237,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-3',
     description: 'Fresh mixed greens with house dressing',
     isAvailable: true,
+    prepStation: 'ben-marie',
   },
   {
     id: 'item-12',
@@ -235,6 +246,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-3',
     description: 'Creamy house-made coleslaw',
     isAvailable: true,
+    prepStation: 'ben-marie',
   },
   // Drinks
   {
@@ -244,6 +256,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-4',
     description: 'Coca-Cola, Sprite, or Fanta',
     isAvailable: true,
+    prepStation: 'ben-marie',
     modifierGroups: [
       {
         id: 'mg-7',
@@ -266,6 +279,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-4',
     description: 'Orange, Apple, or Mixed Berry',
     isAvailable: true,
+    prepStation: 'ben-marie',
   },
   {
     id: 'item-15',
@@ -274,6 +288,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-4',
     description: 'Freshly brewed coffee',
     isAvailable: true,
+    prepStation: 'ben-marie',
     modifierGroups: [
       {
         id: 'mg-8',
@@ -295,6 +310,7 @@ export const mockMenuItems: MenuItem[] = [
     categoryId: 'cat-4',
     description: 'Chocolate, Vanilla, or Strawberry',
     isAvailable: true,
+    prepStation: 'ben-marie',
   },
   // Desserts
   {
@@ -305,6 +321,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Rich chocolate layer cake',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'ben-marie',
     modifierGroups: [
       {
         id: 'mg-9',
@@ -326,6 +343,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'New York style cheesecake',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'ben-marie',
   },
   {
     id: 'item-19',
@@ -335,6 +353,7 @@ export const mockMenuItems: MenuItem[] = [
     description: '2 scoops of your choice',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'ben-marie',
   },
   {
     id: 'item-20',
@@ -344,6 +363,7 @@ export const mockMenuItems: MenuItem[] = [
     description: 'Warm apple pie with cinnamon',
     isAvailable: true,
     applyServiceCharge: true,
+    prepStation: 'kitchen',
   },
 ]
 
@@ -440,6 +460,8 @@ export const mockSettings: Settings = {
   whatsappBreakfastTime: '11:00',
   whatsappLunchTime: '16:00',
   whatsappDinnerTime: '22:00',
+  customRoles: [],
+  waiterVisibleCategoryIds: [],
 }
 
 export const mockProductRecipes = [

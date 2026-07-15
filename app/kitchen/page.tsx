@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { resolveEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Header } from '@/components/shared/header'
 import { OrderQueue } from '@/components/kitchen/order-queue'
@@ -29,7 +30,7 @@ export default function KitchenPage() {
 
   useEffect(() => {
     if (!mounted || !currentUser) return
-    if (settings.kitchenPageEnabled === false && currentUser.role !== 'super-admin') {
+    if (settings.kitchenPageEnabled === false && resolveEffectiveRole(currentUser.role, settings) !== 'super-admin') {
       router.push('/pos')
     }
   }, [currentUser, mounted, router, settings.kitchenPageEnabled])
@@ -71,7 +72,7 @@ export default function KitchenPage() {
     )
   }
 
-  if (settings.kitchenPageEnabled === false && currentUser.role !== 'super-admin') {
+  if (settings.kitchenPageEnabled === false && resolveEffectiveRole(currentUser.role, settings) !== 'super-admin') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center">

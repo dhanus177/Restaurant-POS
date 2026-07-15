@@ -50,6 +50,7 @@ export default function MenuManagementPage() {
     categoryId: '',
     isAvailable: true,
     applyServiceCharge: false,
+    prepStation: 'kitchen' as 'kitchen' | 'ben-marie',
   })
 
   const filteredItems = menuItems.filter((item) => {
@@ -67,6 +68,7 @@ export default function MenuManagementPage() {
       categoryId: item.categoryId,
       isAvailable: item.isAvailable,
       applyServiceCharge: item.applyServiceCharge ?? false,
+      prepStation: item.prepStation ?? 'kitchen',
     })
     setShowForm(true)
   }
@@ -80,6 +82,7 @@ export default function MenuManagementPage() {
       categoryId: categories[0]?.id || '',
       isAvailable: true,
       applyServiceCharge: false,
+      prepStation: 'kitchen',
     })
     setShowForm(true)
   }
@@ -181,6 +184,9 @@ export default function MenuManagementPage() {
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{getCategoryName(item.categoryId)}</Badge>
+                    <Badge variant={item.prepStation === 'ben-marie' ? 'secondary' : 'default'}>
+                      {item.prepStation === 'ben-marie' ? 'Ben-Marie' : 'Kitchen'}
+                    </Badge>
                     {item.applyServiceCharge && <Badge variant="secondary">Service Charge</Badge>}
                     {!item.isAvailable && (
                       <Badge variant="secondary">Unavailable</Badge>
@@ -216,6 +222,7 @@ export default function MenuManagementPage() {
                 <th className="p-3 text-left">Item</th>
                 <th className="p-3 text-left">Category</th>
                 <th className="p-3 text-left">Price</th>
+                <th className="p-3 text-left">Prep Station</th>
                 <th className="p-3 text-left">Service Charge</th>
                 <th className="p-3 text-left">Available</th>
                 <th className="p-3 text-right">Actions</th>
@@ -230,6 +237,11 @@ export default function MenuManagementPage() {
                   </td>
                   <td className="p-3"><Badge variant="outline">{getCategoryName(item.categoryId)}</Badge></td>
                   <td className="p-3">{settings.currencySymbol}{item.price.toFixed(2)}</td>
+                  <td className="p-3">
+                    <Badge variant={item.prepStation === 'ben-marie' ? 'secondary' : 'default'}>
+                      {item.prepStation === 'ben-marie' ? 'Ben-Marie' : 'Kitchen'}
+                    </Badge>
+                  </td>
                   <td className="p-3">{item.applyServiceCharge ? 'Yes' : 'No'}</td>
                   <td className="p-3">
                     <Switch checked={item.isAvailable} onCheckedChange={() => toggleItemAvailability(item.id)} />
@@ -302,6 +314,21 @@ export default function MenuManagementPage() {
                         {cat.name}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="prepStation">Prep Station</Label>
+                <Select
+                  value={formData.prepStation}
+                  onValueChange={(value) => setFormData({ ...formData, prepStation: value as 'kitchen' | 'ben-marie' })}
+                >
+                  <SelectTrigger id="prepStation">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kitchen">Kitchen</SelectItem>
+                    <SelectItem value="ben-marie">Ben-Marie</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

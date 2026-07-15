@@ -7,6 +7,7 @@ import { Header } from '@/components/shared/header'
 import { MenuGrid } from '@/components/pos/menu-grid'
 import { Cart } from '@/components/pos/cart'
 import { OrderModifiers } from '@/components/pos/order-modifiers'
+import { ExtraItemsDialog } from '@/components/pos/extra-items-dialog'
 import { TableSelector } from '@/components/pos/table-selector'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
@@ -35,6 +36,7 @@ export default function POSPage() {
     createCustomer,
     addToCart,
     cart,
+    menuItems,
     selectedTable,
     settings,
     getCartTotal,
@@ -42,6 +44,8 @@ export default function POSPage() {
   const [mounted, setMounted] = useState(false)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [showModifiers, setShowModifiers] = useState(false)
+  const [showExtraItems, setShowExtraItems] = useState(false)
+  const [extraItemsSource, setExtraItemsSource] = useState<MenuItem | null>(null)
   const [showTableSelector, setShowTableSelector] = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [orderMode, setOrderMode] = useState<'dine-in' | 'takeaway'>('dine-in')
@@ -125,31 +129,7 @@ export default function POSPage() {
     return false
   }
 
-  const handleSelectItem = (item: MenuItem) => {
-    if (!ensureCustomerReady()) return
-    if (!ensureOrderModeReady()) return
-
-    if (item.modifierGroups && item.modifierGroups.length > 0) {
-      setSelectedItem(item)
-      setShowModifiers(true)
-    } else {
-      // Add directly to cart without modifiers
-      addToCart({
-        id: `cart-${Date.now()}`,
-        menuItemId: item.id,
-        name: item.name,
-        quantity: 1,
-        price: item.price,
-        modifiers: [],
-        serviceChargeApplicable: item.applyServiceCharge,
-      })
-    }
-  }
-
-  const handleConfirmModifiers = (item: MenuItem, modifiers: SelectedModifier[], quantity: number) => {
-    if (!ensureCustomerReady()) return
-    if (!ensureOrderModeReady()) return
-
+  const addMenuItemToCart = (item: MenuItem, modifiers: SelectedModifier[] = [], quantity = 1) => {
     addToCart({
       id: `cart-${Date.now()}`,
       menuItemId: item.id,
@@ -159,8 +139,62 @@ export default function POSPage() {
       modifiers,
       serviceChargeApplicable: item.applyServiceCharge,
     })
+  }
+
+  const openExtraItemsPrompt = (sourceItem: MenuItem) => {
+    const hasOtherItems = menuItems.some((item) => item.isAvailable && item.id !== sourceItem.id)
+    if (!hasOtherItems) {
+      setExtraItemsSource(null)
+      setShowExtraItems(false)
+      return
+    }
+
+    setExtraItemsSource(sourceItem)
+    setShowExtraItems(true)
+  }
+
+  const closeExtraItemsPrompt = () => {
+    setShowExtraItems(false)
+    setExtraItemsSource(null)
+  }
+
+  const handleSelectItem = (item: MenuItem) => {
+    if (!ensureCustomerReady()) return
+    if (!ensureOrderModeReady()) return
+
+    if (item.modifierGroups && item.modifierGroups.length > 0) {
+      setExtraItemsSource(item)
+      setSelectedItem(item)
+      setShowModifiers(true)
+    } else {
+      addMenuItemToCart(item)
+      openExtraItemsPrompt(item)
+    }
+  }
+
+  const handleConfirmModifiers = (item: MenuItem, modifiers: SelectedModifier[], quantity: number) => {
+    if (!ensureCustomerReady()) return
+    if (!ensureOrderModeReady()) return
+
+    addMenuItemToCart(item, modifiers, quantity)
     setShowModifiers(false)
     setSelectedItem(null)
+
+    if (extraItemsSource) {
+      setShowExtraItems(true)
+    }
+  }
+
+  const handleSelectExtraItem = (item: MenuItem) => {
+    if (item.modifierGroups && item.modifierGroups.length > 0) {
+      setShowExtraItems(false)
+      setSelectedItem(item)
+      setShowModifiers(true)
+      return
+    }
+
+    addMenuItemToCart(item)
+    toast.success(`${item.name} added as an extra item`)
   }
 
   const setLookupPhone = (value: string) => {
@@ -368,6 +402,15 @@ export default function POSPage() {
           setSelectedItem(null)
         }}
         onConfirm={handleConfirmModifiers}
+      />
+
+      <ExtraItemsDialog
+        open={showExtraItems}
+        sourceItem={extraItemsSource}
+        items={menuItems}
+        currencySymbol={settings.currencySymbol}
+        onSelectItem={handleSelectExtraItem}
+        onClose={closeExtraItemsPrompt}
       />
 
       <TableSelector

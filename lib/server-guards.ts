@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { hasEffectiveRole } from '@/lib/roles'
 import { getSessionFromRequest } from '@/lib/session'
 
 type GuardResult<T> =
@@ -96,7 +97,9 @@ export async function requireRole(req: Request, roles: string[]): Promise<GuardR
   const actor = await authenticateActor(req)
   if (!actor.ok) return actor
 
-  if (!roles.includes(actor.value.role)) {
+  const settings = await prisma.settings.findUnique({ where: { id: 'singleton' } })
+
+  if (!hasEffectiveRole(actor.value.role, roles as any, settings)) {
     return {
       ok: false,
       response: NextResponse.json(

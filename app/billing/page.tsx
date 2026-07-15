@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { generateBarcodeSVG, generateBillCode } from '@/lib/print'
-import { printReceipt } from '@/lib/print'
+import { printKitchenDocket, printReceipt } from '@/lib/print'
 import { ReceiptText, ScanBarcode, Users, Printer } from 'lucide-react'
 import type { Order } from '@/lib/types'
 
@@ -121,6 +121,8 @@ export default function BillingPage() {
       if (selectedTable) {
         updateTableStatus(selectedTable.id, 'occupied', order.id)
       }
+
+      printKitchenDocket(order, settings)
 
       // Print billing slip with barcode for pay counter scanning
       printReceipt(order, settings)

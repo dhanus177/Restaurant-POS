@@ -32,7 +32,7 @@ const currencies = [
 ]
 
 export default function SettingsPage() {
-  const { currentUser, settings, updateSettings, loadFromDB } = usePOSStore()
+  const { currentUser, categories, settings, updateSettings, loadFromDB } = usePOSStore()
   const [formData, setFormData] = useState(settings)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -613,6 +613,39 @@ export default function SettingsPage() {
           <p className="text-xs text-muted-foreground">
             Disable a page to lock access for all non-super-admin users.
           </p>
+
+          <div className="space-y-3 rounded-lg border p-4">
+            <div>
+              <Label>Waiter visible categories</Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Choose which menu categories waiters are allowed to see. Leave all unselected to show every category.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => {
+                const isSelected = (formData.waiterVisibleCategoryIds ?? []).includes(category.id)
+                return (
+                  <Button
+                    key={category.id}
+                    type="button"
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      const current = formData.waiterVisibleCategoryIds ?? []
+                      setFormData({
+                        ...formData,
+                        waiterVisibleCategoryIds: isSelected
+                          ? current.filter((id) => id !== category.id)
+                          : [...current, category.id],
+                      })
+                    }}
+                  >
+                    {category.name}
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
           </fieldset>
         </CardContent>
       </Card>

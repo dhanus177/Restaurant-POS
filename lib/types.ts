@@ -1,5 +1,13 @@
 // User & Roles
-export type Role = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway' | 'waiter'
+export type BuiltInRole = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway' | 'waiter'
+export type Role = string
+
+export interface RoleDefinition {
+  id: string
+  name: string
+  baseRole: Exclude<BuiltInRole, 'super-admin'> | 'super-admin'
+  system?: boolean
+}
 
 export interface User {
   id: string
@@ -62,6 +70,7 @@ export interface MenuItem {
   modifierGroups?: ModifierGroup[]
   isAvailable: boolean
   applyServiceCharge?: boolean
+  prepStation?: 'kitchen' | 'ben-marie'
 }
 
 // Orders
@@ -290,4 +299,6 @@ export interface Settings {
   whatsappBreakfastTime?: string
   whatsappLunchTime?: string
   whatsappDinnerTime?: string
+  customRoles?: RoleDefinition[]
+  waiterVisibleCategoryIds?: string[]
 }

@@ -35,6 +35,7 @@ model MenuItem {
   image          String?
   isAvailable    Boolean         @default(true)
   applyServiceCharge Boolean     @default(false)
+  prepStation    String          @default("kitchen")
   modifierGroups ModifierGroup[]
   recipes        ProductRecipe[]
 }
@@ -207,6 +208,8 @@ model Settings {
   whatsappBreakfastTime  String  @default("11:00")
   whatsappLunchTime      String  @default("16:00")
   whatsappDinnerTime     String  @default("22:00")
+  customRoles            Json?
+  waiterVisibleCategoryIds Json?
 }
 
 model WhatsAppReportDispatch {

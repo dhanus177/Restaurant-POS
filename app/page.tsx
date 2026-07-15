@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { apiFetch } from '@/lib/api'
+import { hasEffectiveRole, resolveEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { useIsMobile } from '@/hooks/use-mobile'
 import Link from 'next/link'
@@ -59,7 +60,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!checkingSetup && setupStatus?.setupComplete && currentUser) {
-      if (isMobile && !['super-admin', 'cashier'].includes(currentUser.role)) {
+      if (isMobile && !hasEffectiveRole(currentUser.role, ['super-admin', 'cashier'], settings)) {
         void logout()
         setError('Mobile login is allowed only for Super Admin and Cashier roles')
         setPin('')
@@ -70,7 +71,7 @@ export default function LoginPage() {
   }, [checkingSetup, currentUser, setupStatus, isMobile, logout])
 
   const redirectToRole = (role: string) => {
-    switch (role) {
+    switch (resolveEffectiveRole(role, settings)) {
       case 'super-admin':
         router.push('/admin')
         break
@@ -107,7 +108,7 @@ export default function LoginPage() {
       if (newPin.length === 4) {
         const user = await loginWithPin(newPin)
         if (user) {
-          if (isMobile && !['super-admin', 'cashier'].includes(user.role)) {
+          if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'cashier'], settings)) {
             await logout()
             setError('Mobile login is allowed only for Super Admin and Cashier roles')
             setTimeout(() => setPin(''), 300)
@@ -149,7 +150,7 @@ export default function LoginPage() {
     }
     const user = await loginWithPin(pins[role])
     if (user) {
-      if (isMobile && !['super-admin', 'cashier'].includes(user.role)) {
+      if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'cashier'], settings)) {
         await logout()
         setError('Mobile login is allowed only for Super Admin and Cashier roles')
         setPin('')

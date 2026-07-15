@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/shared/header'
 import { usePOSStore } from '@/lib/store'
+import { hasEffectiveRole } from '@/lib/roles'
 import { apiFetch } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -74,9 +75,9 @@ export default function PayPage() {
   const [isSavingDrawer, setIsSavingDrawer] = useState(false)
   const [isSavingCashOut, setIsSavingCashOut] = useState(false)
   const [isClosingDrawer, setIsClosingDrawer] = useState(false)
-  const canReverseBills = currentUser?.role === 'admin' || currentUser?.role === 'super-admin'
-  const canManageDrawer = ['admin', 'super-admin', 'pay-counter'].includes(currentUser?.role ?? '')
-  const canRecordCashOut = ['admin', 'super-admin', 'pay-counter'].includes(currentUser?.role ?? '')
+  const canReverseBills = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings)
+  const canManageDrawer = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings)
+  const canRecordCashOut = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings)
 
   useEffect(() => {
     setMounted(true)
@@ -98,10 +99,10 @@ export default function PayPage() {
       return
     }
 
-    if (mounted && currentUser && !['admin', 'super-admin', 'pay-counter'].includes(currentUser.role)) {
+    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'pay-counter'], settings)) {
       router.push('/pos')
     }
-  }, [currentUser, mounted, router])
+  }, [currentUser, mounted, router, settings])
 
   const unpaidOrders = useMemo(
     () => orders.filter((o) => o.paymentStatus === 'pending').sort((a, b) => b.orderNumber - a.orderNumber),
@@ -351,7 +352,7 @@ export default function PayPage() {
 
   const closeoutVariance = Number(countedCashInput || 0) - drawerBalance.currentBalance
 
-  if (!mounted || !currentUser || !['admin', 'super-admin', 'pay-counter'].includes(currentUser.role)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'pay-counter'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>

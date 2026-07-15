@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Header } from '@/components/shared/header'
 import { StockTable } from '@/components/inventory/stock-table'
@@ -41,10 +42,10 @@ export default function InventoryPage() {
   useEffect(() => {
     if (mounted && !currentUser) {
       router.push('/')
-    } else if (mounted && !['admin', 'super-admin'].includes(currentUser?.role ?? '')) {
+    } else if (mounted && !hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings)) {
       router.push('/pos')
     }
-  }, [currentUser, mounted, router])
+  }, [currentUser, mounted, router, settings])
 
   const lowStockItems = getLowStockItems()
   const outOfStockItems = inventory.filter((item) => item.quantity <= 0)
@@ -80,7 +81,7 @@ export default function InventoryPage() {
     }
   }
 
-  if (!mounted || !currentUser || !['admin', 'super-admin'].includes(currentUser.role)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>

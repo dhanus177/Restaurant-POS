@@ -11,6 +11,9 @@ import type { MenuItem, Category } from '@/lib/types'
 
 interface MenuGridProps {
   onSelectItem: (item: MenuItem) => void
+  prepStationFilter?: 'all' | 'kitchen' | 'ben-marie'
+  showCategoryTabs?: boolean
+  allowedCategoryIds?: string[]
 }
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -21,50 +24,57 @@ const categoryIcons: Record<string, React.ReactNode> = {
   'cake': <Cake className="h-4 w-4" />,
 }
 
-export function MenuGrid({ onSelectItem }: MenuGridProps) {
+export function MenuGrid({ onSelectItem, prepStationFilter = 'all', showCategoryTabs = true, allowedCategoryIds }: MenuGridProps) {
   const { categories, menuItems, settings } = usePOSStore()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
   const sortedCategories = [...categories].sort((a, b) => a.order - b.order)
-  const filteredItems = selectedCategory
-    ? menuItems.filter((item) => item.categoryId === selectedCategory)
-    : menuItems
+  const filteredItems = menuItems.filter((item) => {
+    const matchesAllowedCategories = !allowedCategoryIds || allowedCategoryIds.length === 0
+      ? true
+      : allowedCategoryIds.includes(item.categoryId)
+    const matchesCategory = selectedCategory ? item.categoryId === selectedCategory : true
+    const matchesPrepStation = prepStationFilter === 'all' ? true : (item.prepStation ?? 'kitchen') === prepStationFilter
+    return matchesAllowedCategories && matchesCategory && matchesPrepStation
+  })
 
   return (
     <div className="flex h-full flex-col">
       {/* Category Tabs */}
-      <div className="border-b border-border p-2">
-        <div className="overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2 pr-2">
-            <Button
-              variant={selectedCategory === null ? 'default' : 'secondary'}
-              size="sm"
-              className={cn(
-                'h-10 flex-shrink-0 gap-2 px-4 sm:h-11 sm:px-6',
-                selectedCategory === null && 'bg-primary text-primary-foreground'
-              )}
-              onClick={() => setSelectedCategory(null)}
-            >
-              All
-            </Button>
-            {sortedCategories.map((category) => (
+      {showCategoryTabs && (
+        <div className="border-b border-border p-2">
+          <div className="overflow-x-auto pb-1">
+            <div className="flex min-w-max gap-2 pr-2">
               <Button
-                key={category.id}
-                variant={selectedCategory === category.id ? 'default' : 'secondary'}
+                variant={selectedCategory === null ? 'default' : 'secondary'}
                 size="sm"
                 className={cn(
                   'h-10 flex-shrink-0 gap-2 px-4 sm:h-11 sm:px-6',
-                  selectedCategory === category.id && 'bg-primary text-primary-foreground'
+                  selectedCategory === null && 'bg-primary text-primary-foreground'
                 )}
-                onClick={() => setSelectedCategory(category.id)}
+                onClick={() => setSelectedCategory(null)}
               >
-                {category.icon && categoryIcons[category.icon]}
-                {category.name}
+                All
               </Button>
-            ))}
+              {sortedCategories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant={selectedCategory === category.id ? 'default' : 'secondary'}
+                  size="sm"
+                  className={cn(
+                    'h-10 flex-shrink-0 gap-2 px-4 sm:h-11 sm:px-6',
+                    selectedCategory === category.id && 'bg-primary text-primary-foreground'
+                  )}
+                  onClick={() => setSelectedCategory(category.id)}
+                >
+                  {category.icon && categoryIcons[category.icon]}
+                  {category.name}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Menu Items Grid */}
       <ScrollArea className="flex-1 p-3 sm:p-4">
@@ -100,11 +110,16 @@ export function MenuGrid({ onSelectItem }: MenuGridProps) {
                     Sold Out
                   </Badge>
                 )}
-                {item.modifierGroups && item.modifierGroups.length > 0 && item.isAvailable && (
-                  <Badge variant="outline" className="text-xs">
-                    Options
+                <div className="flex items-center gap-1">
+                  <Badge variant={(item.prepStation ?? 'kitchen') === 'ben-marie' ? 'secondary' : 'default'} className="text-[10px]">
+                    {(item.prepStation ?? 'kitchen') === 'ben-marie' ? 'Ben-Marie' : 'Kitchen'}
                   </Badge>
-                )}
+                  {item.modifierGroups && item.modifierGroups.length > 0 && item.isAvailable && (
+                    <Badge variant="outline" className="text-xs">
+                      Options
+                    </Badge>
+                  )}
+                </div>
               </div>
             </Button>
           ))}
