@@ -288,8 +288,10 @@ export function generateSupplierStatementHTML(
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${formatDateTime(entry.createdAt)}</td>
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-transform: uppercase;">${entry.type}</td>
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${entry.reference ?? '-'}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${entry.paymentMethod ? entry.paymentMethod.replace('-', ' ') : '-'}</td>
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right;">${entry.quantity ?? '-'}</td>
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(entry.amount, settings.currencySymbol)}</td>
+      <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${Array.isArray(entry.billItems) && entry.billItems.length > 0 ? entry.billItems.map((item: any) => `${item.quantity}x ${item.name}`).join(', ') : '-'}</td>
       <td style="padding: 6px 4px; border-bottom: 1px solid #eee;">${entry.notes ?? '-'}</td>
     </tr>`
     )
@@ -374,13 +376,15 @@ export function generateSupplierStatementHTML(
               <th>Date</th>
               <th>Type</th>
               <th>Reference</th>
+              <th>Method</th>
               <th style="text-align: right;">Qty</th>
               <th style="text-align: right;">Amount</th>
+              <th>Items</th>
               <th>Notes</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || '<tr><td colspan="6" style="padding: 12px 4px;">No ledger entries found.</td></tr>'}
+            ${rows || '<tr><td colspan="8" style="padding: 12px 4px;">No ledger entries found.</td></tr>'}
           </tbody>
         </table>
       </div>

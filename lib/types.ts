@@ -140,6 +140,15 @@ export interface Supplier {
 }
 
 export type SupplierLedgerEntryType = 'purchase' | 'payment' | 'grn' | 'return'
+export type SupplierPaymentMethod = 'cash' | 'cheque' | 'bank-transfer'
+
+export interface SupplierBillItem {
+  id: string
+  name: string
+  quantity: number
+  unitPrice: number
+  total: number
+}
 
 export interface SupplierLedgerEntry {
   id: string
@@ -149,6 +158,9 @@ export interface SupplierLedgerEntry {
   inventoryItemId?: string | null
   quantity?: number | null
   amount: number
+  paymentMethod?: SupplierPaymentMethod | null
+  linkedEntryId?: string | null
+  billItems?: SupplierBillItem[] | null
   notes?: string | null
   createdAt: string
 }

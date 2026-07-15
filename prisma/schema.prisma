@@ -137,11 +137,15 @@ model SupplierLedgerEntry {
   inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   quantity        Float?
   amount          Float
+  paymentMethod   String?
+  linkedEntryId   String?
+  billItems       Json?
   notes           String?
   createdAt       DateTime @default(now())
 
   @@index([supplierId])
   @@index([type])
+  @@index([linkedEntryId])
 }
 
 model InventoryItem {

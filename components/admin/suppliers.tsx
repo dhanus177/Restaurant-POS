@@ -42,7 +42,7 @@ import {
 import { toast } from 'sonner'
 import { printSupplierStatement } from '@/lib/print'
 import { usePOSStore } from '@/lib/store'
-import type { InventoryItem, Supplier, SupplierLedgerEntry, SupplierLedgerEntryType } from '@/lib/types'
+import type { InventoryItem, Supplier, SupplierBillItem, SupplierLedgerEntry, SupplierLedgerEntryType, SupplierPaymentMethod } from '@/lib/types'
 
 const emptyForm = {
   name: '',
@@ -57,7 +57,20 @@ const emptyLedgerForm = {
   inventoryItemId: '',
   quantity: '',
   amount: '',
+  paymentMethod: 'cash' as SupplierPaymentMethod,
+  linkedEntryId: '',
+  billItems: [] as SupplierBillItem[],
   notes: '',
+}
+
+function createEmptyBillItem(): SupplierBillItem {
+  return {
+    id: crypto.randomUUID(),
+    name: '',
+    quantity: 1,
+    unitPrice: 0,
+    total: 0,
+  }
 }
 
 type LedgerDateRange = 'all' | '7days' | '30days' | '90days'
@@ -278,9 +291,9 @@ export function SuppliersManager() {
       const ledgerData = await ledgerRes.json()
       const inventoryData = await inventoryRes.json()
 
-  const nextLedgerEntries = Array.isArray(ledgerData) ? ledgerData : []
-  setLedgerEntries(nextLedgerEntries)
-  setLedgerForm({ ...emptyLedgerForm, reference: getAutoReference('purchase', nextLedgerEntries) })
+      const nextLedgerEntries = Array.isArray(ledgerData) ? ledgerData : []
+      setLedgerEntries(nextLedgerEntries)
+      setLedgerForm({ ...emptyLedgerForm, billItems: [createEmptyBillItem()], reference: getAutoReference('purchase', nextLedgerEntries) })
       setLinkedItems(Array.isArray(inventoryData) ? (inventoryData as InventoryItem[]).filter((item) => item.supplierId === supplier.id) : [])
     } catch (error) {
       console.error('Failed to load supplier ledger:', error)
@@ -309,6 +322,26 @@ export function SuppliersManager() {
       return
     }
 
+    if ((ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') && ledgerForm.billItems.length === 0) {
+      toast.error('Add at least one order item')
+      return
+    }
+
+    if ((ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') && ledgerForm.billItems.some((item) => !item.name.trim() || item.quantity <= 0)) {
+      toast.error('Each order item needs a name and quantity')
+      return
+    }
+
+    if (ledgerForm.type === 'payment' && !ledgerForm.linkedEntryId) {
+      toast.error('Select the supplier bill to pay')
+      return
+    }
+
+    if (ledgerForm.type === 'payment' && selectedPayableBill && amount > selectedPayableBill.remaining) {
+      toast.error(`Payment exceeds remaining balance of ${selectedPayableBill.remaining.toFixed(2)}`)
+      return
+    }
+
     setLedgerSaving(true)
     try {
       const res = await apiFetch(`/api/suppliers/${ledgerSupplier.id}/ledger`, {
@@ -320,6 +353,9 @@ export function SuppliersManager() {
           inventoryItemId: ledgerForm.inventoryItemId || null,
           quantity,
           amount,
+          paymentMethod: ledgerForm.type === 'payment' ? ledgerForm.paymentMethod : null,
+          linkedEntryId: ledgerForm.type === 'payment' ? ledgerForm.linkedEntryId || null : null,
+          billItems: ledgerForm.type === 'purchase' || ledgerForm.type === 'grn' ? ledgerForm.billItems : [],
           notes: ledgerForm.notes,
         }),
       })
@@ -332,6 +368,8 @@ export function SuppliersManager() {
         setLedgerForm((form) => ({
           ...emptyLedgerForm,
           type: form.type,
+          paymentMethod: form.type === 'payment' ? 'cash' : 'cash',
+          billItems: form.type === 'purchase' || form.type === 'grn' ? [createEmptyBillItem()] : [],
           reference: getAutoReference(form.type, next),
         }))
         return next
@@ -374,6 +412,33 @@ export function SuppliersManager() {
       balance: purchases - returnsAndPayments,
     }
   }, [ledgerEntries])
+
+  const payableBills = useMemo(() => {
+    const billEntries = ledgerEntries
+      .filter((entry) => entry.type === 'purchase' || entry.type === 'grn')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    return billEntries
+      .map((entry) => {
+        const applied = ledgerEntries
+          .filter((ledgerEntry) => (ledgerEntry.type === 'payment' || ledgerEntry.type === 'return') && ledgerEntry.linkedEntryId === entry.id)
+          .reduce((sum, ledgerEntry) => sum + ledgerEntry.amount, 0)
+
+        const remaining = Math.max(0, entry.amount - applied)
+
+        return {
+          ...entry,
+          applied,
+          remaining,
+        }
+      })
+      .filter((entry) => entry.remaining > 0)
+  }, [ledgerEntries])
+
+  const selectedPayableBill = useMemo(
+    () => payableBills.find((entry) => entry.id === ledgerForm.linkedEntryId) ?? null,
+    [payableBills, ledgerForm.linkedEntryId]
+  )
 
   const ledgerTypeLabel: Record<SupplierLedgerEntryType, string> = {
     purchase: 'Purchase',
@@ -420,9 +485,54 @@ export function SuppliersManager() {
   function handleLedgerTypeChange(type: SupplierLedgerEntryType) {
     setLedgerForm((current) => ({
       ...current,
+      ...emptyLedgerForm,
       type,
       reference: getAutoReference(type, ledgerEntries),
     }))
+  }
+
+  function updateBillItem(itemId: string, patch: Partial<SupplierBillItem>) {
+    setLedgerForm((current) => {
+      const nextItems = current.billItems.map((item) => {
+        if (item.id !== itemId) return item
+        const next = { ...item, ...patch }
+        const quantity = Number(next.quantity) || 0
+        const unitPrice = Number(next.unitPrice) || 0
+        return {
+          ...next,
+          quantity,
+          unitPrice,
+          total: Number((quantity * unitPrice).toFixed(2)),
+        }
+      })
+
+      const nextAmount = nextItems.reduce((sum, item) => sum + item.total, 0)
+
+      return {
+        ...current,
+        billItems: nextItems,
+        amount: (current.type === 'purchase' || current.type === 'grn') ? nextAmount.toFixed(2) : current.amount,
+      }
+    })
+  }
+
+  function addBillItemRow() {
+    setLedgerForm((current) => ({
+      ...current,
+      billItems: [...current.billItems, createEmptyBillItem()],
+    }))
+  }
+
+  function removeBillItemRow(itemId: string) {
+    setLedgerForm((current) => {
+      const nextItems = current.billItems.filter((item) => item.id !== itemId)
+      const nextAmount = nextItems.reduce((sum, item) => sum + item.total, 0)
+      return {
+        ...current,
+        billItems: nextItems,
+        amount: (current.type === 'purchase' || current.type === 'grn') ? nextAmount.toFixed(2) : current.amount,
+      }
+    })
   }
 
   function handlePrintStatement() {
@@ -767,6 +877,48 @@ export function SuppliersManager() {
                     />
                   </div>
 
+                  {ledgerForm.type === 'payment' && (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="ledger-payment-method">Payment Method</Label>
+                        <select
+                          id="ledger-payment-method"
+                          className="h-10 rounded-md border bg-background px-3 text-sm"
+                          value={ledgerForm.paymentMethod}
+                          onChange={(e) => setLedgerForm((current) => ({ ...current, paymentMethod: e.target.value as SupplierPaymentMethod }))}
+                        >
+                          <option value="cash">Cash</option>
+                          <option value="cheque">Cheque</option>
+                          <option value="bank-transfer">Bank Transfer</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="ledger-linked-bill">Supplier Bill</Label>
+                        <select
+                          id="ledger-linked-bill"
+                          className="h-10 rounded-md border bg-background px-3 text-sm"
+                          value={ledgerForm.linkedEntryId}
+                          onChange={(e) => setLedgerForm((current) => ({ ...current, linkedEntryId: e.target.value }))}
+                        >
+                          <option value="">Select a bill to part-pay</option>
+                          {payableBills.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {(entry.reference || 'Bill')} • Due {settings.currencySymbol}{entry.remaining.toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                        {selectedPayableBill && (
+                          <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                            <p>Invoice total: <span className="font-medium text-foreground">{settings.currencySymbol}{selectedPayableBill.amount.toFixed(2)}</span></p>
+                            <p>Already paid: <span className="font-medium text-foreground">{settings.currencySymbol}{selectedPayableBill.applied.toFixed(2)}</span></p>
+                            <p>Remaining: <span className="font-medium text-foreground">{settings.currencySymbol}{selectedPayableBill.remaining.toFixed(2)}</span></p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                   <div className="grid gap-2">
                     <Label htmlFor="ledger-item">Inventory Item</Label>
                     <select
@@ -781,6 +933,75 @@ export function SuppliersManager() {
                       ))}
                     </select>
                   </div>
+
+                  {(ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') && (
+                    <div className="grid gap-3 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Order Items</p>
+                          <p className="text-xs text-muted-foreground">Add supplier bill lines to track what was ordered.</p>
+                        </div>
+                        <Button type="button" variant="outline" size="sm" onClick={addBillItemRow}>
+                          <Plus className="mr-1 h-4 w-4" />
+                          Add Item
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {ledgerForm.billItems.map((item, index) => (
+                          <div key={item.id} className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-[minmax(0,1.7fr)_90px_110px_110px_auto] md:items-end">
+                            <div className="grid gap-1.5">
+                              <Label htmlFor={`bill-item-name-${item.id}`}>Item {index + 1}</Label>
+                              <Input
+                                id={`bill-item-name-${item.id}`}
+                                value={item.name}
+                                onChange={(e) => updateBillItem(item.id, { name: e.target.value })}
+                                placeholder="Rice bag / soft drinks carton"
+                              />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor={`bill-item-qty-${item.id}`}>Qty</Label>
+                              <Input
+                                id={`bill-item-qty-${item.id}`}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.quantity}
+                                onChange={(e) => updateBillItem(item.id, { quantity: Number(e.target.value) })}
+                              />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label htmlFor={`bill-item-price-${item.id}`}>Unit Price</Label>
+                              <Input
+                                id={`bill-item-price-${item.id}`}
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.unitPrice}
+                                onChange={(e) => updateBillItem(item.id, { unitPrice: Number(e.target.value) })}
+                              />
+                            </div>
+                            <div className="grid gap-1.5">
+                              <Label>Total</Label>
+                              <div className="flex h-10 items-center rounded-md border bg-muted/30 px-3 text-sm font-medium text-foreground">
+                                {settings.currencySymbol}{item.total.toFixed(2)}
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => removeBillItemRow(item.id)}
+                              disabled={ledgerForm.billItems.length === 1}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
@@ -891,6 +1112,8 @@ export function SuppliersManager() {
                           <TableHead>Date</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Reference</TableHead>
+                          <TableHead>Method / Bill</TableHead>
+                          <TableHead>Order Items</TableHead>
                           <TableHead>Qty</TableHead>
                           <TableHead>Amount</TableHead>
                           <TableHead>Notes</TableHead>
@@ -906,6 +1129,21 @@ export function SuppliersManager() {
                               </Badge>
                             </TableCell>
                             <TableCell>{entry.reference || '—'}</TableCell>
+                            <TableCell>
+                              <div className="space-y-0.5 text-xs text-muted-foreground">
+                                <div>{entry.paymentMethod ? entry.paymentMethod.replace('-', ' ') : '—'}</div>
+                                <div>
+                                  {entry.linkedEntryId
+                                    ? `Bill: ${ledgerEntries.find((ledgerEntry) => ledgerEntry.id === entry.linkedEntryId)?.reference || 'Linked invoice'}`
+                                    : '—'}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-[260px] text-xs text-muted-foreground">
+                              {entry.billItems && entry.billItems.length > 0
+                                ? entry.billItems.map((item) => `${item.quantity}x ${item.name}`).join(', ')
+                                : '—'}
+                            </TableCell>
                             <TableCell>{entry.quantity ?? '—'}</TableCell>
                             <TableCell>{entry.amount.toFixed(2)}</TableCell>
                             <TableCell className="max-w-[260px] truncate text-muted-foreground">{entry.notes || '—'}</TableCell>
