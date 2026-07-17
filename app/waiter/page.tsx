@@ -122,8 +122,7 @@ export default function WaiterPage() {
   const [multiGroupSets, setMultiGroupSets] = useState<number[][]>([])
   const [recentlyQueuedChairs, setRecentlyQueuedChairs] = useState<number[]>([])
   const [isSending, setIsSending] = useState(false)
-  const [isSendingKitchen, setIsSendingKitchen] = useState(false)
-  const [isSendingBenMarie, setIsSendingBenMarie] = useState(false)
+  const [isSendingPrep, setIsSendingPrep] = useState(false)
   const [showMobileHandoff, setShowMobileHandoff] = useState(false)
   const tableSectionRef = useRef<HTMLDivElement | null>(null)
   const isMobile = useIsMobile()
@@ -265,6 +264,14 @@ export default function WaiterPage() {
   const handoffViewTotal = useMemo(
     () => handoffViewItems.reduce((sum, item) => sum + getItemLineTotal(item), 0),
     [handoffViewItems]
+  )
+  const hasKitchenDispatchItems = useMemo(
+    () => dispatchItems.some((item) => (item.prepStation ?? 'kitchen') === 'kitchen'),
+    [dispatchItems]
+  )
+  const hasBenMarieDispatchItems = useMemo(
+    () => dispatchItems.some((item) => (item.prepStation ?? 'kitchen') === 'ben-marie'),
+    [dispatchItems]
   )
   const isSelectedChairLocked = lockedChairNumbers.includes(selectedChair)
   const waiterVisibleCategoryIds = settings.waiterVisibleCategoryIds ?? []
@@ -658,7 +665,76 @@ export default function WaiterPage() {
     }
   }
 
-  const handleSendToKitchen = async () => {
+  const sendStationDockets = async (station: 'kitchen' | 'ben-marie') => {
+    const stationLabel = station === 'kitchen' ? 'Kitchen' : 'Ben-Marie'
+    const stationItemsAll = dispatchItems.filter((item) => (item.prepStation ?? 'kitchen') === station)
+
+    if (stationItemsAll.length === 0) {
+      return { sent: false, stationLabel, ordersCount: 0 }
+    }
+
+    try {
+      const stationItemsToPrint = getUnsentStationCartItems(station, dispatchChairNumbers)
+      if (stationItemsToPrint.length === 0) {
+        return { sent: false, stationLabel, ordersCount: 0 }
+      }
+
+      const stationOrders = buildStationOrders(stationItemsAll, station)
+      const targetOrderIds: string[] = []
+      const sentAt = new Date().toISOString()
+
+      stationOrders.forEach((order) => {
+        const chairNumber = getOrderChairNumber(order)
+        const existingStationOrder = orders.find((existingOrder) => {
+          if (existingOrder.paymentStatus !== 'pending') return false
+          if (station === 'kitchen' ? !isKitchenDocketOrder(existingOrder) : !isBenMarieDocketOrder(existingOrder)) return false
+          if (existingOrder.tableId !== order.tableId) return false
+
+          const existingChairs = getOrderChairNumbers(existingOrder)
+          if (existingChairs.length !== 1) return false
+
+          return chairNumber !== null && existingChairs[0] === chairNumber
+        })
+
+        if (existingStationOrder) {
+          updateOrder(existingStationOrder.id, {
+            items: order.items,
+            subtotal: order.subtotal,
+            tax: order.tax,
+            total: order.total,
+            updatedAt: new Date().toISOString(),
+          })
+          if (station === 'kitchen') {
+            printKitchenDocket(order, settings)
+          } else {
+            printBenMarieDocket(order, settings)
+          }
+          targetOrderIds.push(existingStationOrder.id)
+        } else {
+          addOrder(order)
+          if (station === 'kitchen') {
+            printKitchenDocket(order, settings)
+          } else {
+            printBenMarieDocket(order, settings)
+          }
+          targetOrderIds.push(order.id)
+        }
+      })
+
+      markCartItemsSentForStation(stationItemsToPrint.map((item) => item.id), station, sentAt)
+
+      if (selectedTable && targetOrderIds.length > 0) {
+        updateTableStatus(selectedTable.id, 'occupied', targetOrderIds[0])
+      }
+
+      return { sent: true, stationLabel, ordersCount: stationOrders.length }
+    } catch (error) {
+      console.error(`[waiter ${station} send error]`, error)
+      throw error
+    }
+  }
+
+  const handleSendToPrepStations = async () => {
     if (!ensureReady()) return
     if (handoffMode === 'multi' && dispatchChairNumbers.length === 0) {
       toast.error('Select at least one chair for multi handoff')
@@ -667,142 +743,33 @@ export default function WaiterPage() {
     if (dispatchItems.length === 0) {
       toast.error(
         handoffMode === 'multi'
-          ? 'Add at least one item for the selected handoff chairs before sending to kitchen'
-          : `Add at least one item for Chair ${selectedChair} before sending to kitchen`
+          ? 'Add at least one item for the selected handoff chairs before sending dockets'
+          : `Add at least one item for Chair ${selectedChair} before sending dockets`
       )
       return
     }
+    if (!hasKitchenDispatchItems && !hasBenMarieDispatchItems) {
+      toast.error('No Kitchen or Ben-Marie items found in the selected chairs')
+      return
+    }
 
-    setIsSendingKitchen(true)
+    setIsSendingPrep(true)
     try {
-      const kitchenItemsAll = dispatchItems.filter((item) => (item.prepStation ?? 'kitchen') === 'kitchen')
-      const kitchenItemsToPrint = getUnsentStationCartItems('kitchen', dispatchChairNumbers)
-      if (kitchenItemsToPrint.length === 0) {
-        toast.info('No new kitchen items to print')
+      const [kitchenResult, benMarieResult] = await Promise.all([
+        sendStationDockets('kitchen'),
+        sendStationDockets('ben-marie'),
+      ])
+
+      const sentStations = [kitchenResult, benMarieResult].filter((result) => result.sent)
+      if (sentStations.length === 0) {
+        toast.info('No new station items to print')
         return
       }
 
-      const kitchenOrders = buildStationOrders(kitchenItemsAll, 'kitchen')
-      const targetOrderIds: string[] = []
-      const sentAt = new Date().toISOString()
-
-      kitchenOrders.forEach((order) => {
-        const chairNumber = getOrderChairNumber(order)
-        const existingKitchenOrder = orders.find((existingOrder) => {
-          if (existingOrder.paymentStatus !== 'pending') return false
-          if (!isKitchenDocketOrder(existingOrder)) return false
-          if (existingOrder.tableId !== order.tableId) return false
-
-          const existingChairs = getOrderChairNumbers(existingOrder)
-          if (existingChairs.length !== 1) return false
-
-          return chairNumber !== null && existingChairs[0] === chairNumber
-        })
-
-        if (existingKitchenOrder) {
-          updateOrder(existingKitchenOrder.id, {
-            items: order.items,
-            subtotal: order.subtotal,
-            tax: order.tax,
-            total: order.total,
-            updatedAt: new Date().toISOString(),
-          })
-          printKitchenDocket(
-            order,
-            settings
-          )
-          targetOrderIds.push(existingKitchenOrder.id)
-        } else {
-          addOrder(order)
-          printKitchenDocket(order, settings)
-          targetOrderIds.push(order.id)
-        }
-      })
-
-      markCartItemsSentForStation(kitchenItemsToPrint.map((item) => item.id), 'kitchen', sentAt)
-
-      if (selectedTable && targetOrderIds.length > 0) {
-        updateTableStatus(selectedTable.id, 'occupied', targetOrderIds[0])
-      }
-
-      toast.success(
-        kitchenOrders.length === 1
-          ? `Kitchen order sent for Chair ${kitchenOrders[0].tableName?.split('• Chair ')[1] ?? selectedChair}`
-          : `${kitchenOrders.length} chair kitchen dockets sent (${dispatchChairNumbers.join(', ')})`
-      )
+      const sentLabels = sentStations.map((result) => result.stationLabel).join(' + ')
+      toast.success(`Sent separate ${sentLabels} dockets for chairs ${dispatchChairNumbers.join(', ')}`)
     } finally {
-      setIsSendingKitchen(false)
-    }
-  }
-
-  const handleSendToBenMarie = async () => {
-    if (!ensureReady()) return
-    if (handoffMode === 'multi' && dispatchChairNumbers.length === 0) {
-      toast.error('Select at least one chair for multi handoff')
-      return
-    }
-
-    const benMarieItemsAll = dispatchItems.filter((item) => (item.prepStation ?? 'kitchen') === 'ben-marie')
-    if (benMarieItemsAll.length === 0) {
-      toast.error(
-        handoffMode === 'multi'
-          ? 'No Ben-Marie items in selected handoff chairs'
-          : `No Ben-Marie items for Chair ${selectedChair}`
-      )
-      return
-    }
-
-    setIsSendingBenMarie(true)
-    try {
-      const benMarieItemsToPrint = getUnsentStationCartItems('ben-marie', dispatchChairNumbers)
-      if (benMarieItemsToPrint.length === 0) {
-        toast.info('No new Ben-Marie items to print')
-        return
-      }
-
-      const benMarieOrders = buildStationOrders(benMarieItemsAll, 'ben-marie')
-      const targetOrderIds: string[] = []
-      const sentAt = new Date().toISOString()
-
-      benMarieOrders.forEach((order) => {
-        const chairNumber = getOrderChairNumber(order)
-        const existingBenMarieOrder = orders.find((existingOrder) => {
-          if (existingOrder.paymentStatus !== 'pending') return false
-          if (!isBenMarieDocketOrder(existingOrder)) return false
-          if (existingOrder.tableId !== order.tableId) return false
-
-          const existingChairs = getOrderChairNumbers(existingOrder)
-          if (existingChairs.length !== 1) return false
-
-          return chairNumber !== null && existingChairs[0] === chairNumber
-        })
-
-        if (existingBenMarieOrder) {
-          updateOrder(existingBenMarieOrder.id, {
-            items: order.items,
-            subtotal: order.subtotal,
-            tax: order.tax,
-            total: order.total,
-            updatedAt: new Date().toISOString(),
-          })
-          printBenMarieDocket(order, settings)
-          targetOrderIds.push(existingBenMarieOrder.id)
-        } else {
-          addOrder(order)
-          printBenMarieDocket(order, settings)
-          targetOrderIds.push(order.id)
-        }
-      })
-
-      markCartItemsSentForStation(benMarieItemsToPrint.map((item) => item.id), 'ben-marie', sentAt)
-
-      toast.success(
-        benMarieOrders.length === 1
-          ? `Ben-Marie docket sent for Chair ${benMarieOrders[0].tableName?.split('• Chair ')[1] ?? selectedChair}`
-          : `${benMarieOrders.length} Ben-Marie dockets sent (${dispatchChairNumbers.join(', ')})`
-      )
-    } finally {
-      setIsSendingBenMarie(false)
+      setIsSendingPrep(false)
     }
   }
 
@@ -1014,25 +981,12 @@ export default function WaiterPage() {
               variant="secondary"
               className="h-auto min-h-12 justify-start whitespace-normal break-words px-3 py-2 text-left text-sm font-semibold leading-tight"
               onClick={() => {
-                void handleSendToKitchen()
+                void handleSendToPrepStations()
               }}
-              disabled={isSendingKitchen || isSendingBenMarie || isSending || dispatchItems.length === 0 || !selectedTable}
+              disabled={isSendingPrep || isSending || dispatchItems.length === 0 || !selectedTable}
             >
               <UtensilsCrossed className="mr-2 h-4 w-4" />
-              {isSendingKitchen ? 'Sending...' : 'Send to Kitchen'}
-            </Button>
-
-            <Button
-              size="lg"
-              variant="secondary"
-              className="h-auto min-h-12 justify-start whitespace-normal break-words px-3 py-2 text-left text-sm font-semibold leading-tight"
-              onClick={() => {
-                void handleSendToBenMarie()
-              }}
-              disabled={isSendingBenMarie || isSendingKitchen || isSending || dispatchItems.length === 0 || !selectedTable}
-            >
-              <Send className="mr-2 h-4 w-4" />
-              {isSendingBenMarie ? 'Sending...' : 'Send to Ben-Marie'}
+              {isSendingPrep ? 'Sending...' : 'Send Station Dockets'}
             </Button>
 
             <Button
@@ -1042,7 +996,7 @@ export default function WaiterPage() {
                 void handleSendToBiller()
                 setShowMobileHandoff(false)
               }}
-              disabled={isSending || isSendingKitchen || isSendingBenMarie || dispatchItems.length === 0 || !selectedTable}
+              disabled={isSending || isSendingPrep || dispatchItems.length === 0 || !selectedTable}
             >
               {isSending ? 'Sending...' : 'Send Chair Bills to Biller (Print Bill)'}
             </Button>
@@ -1131,25 +1085,12 @@ export default function WaiterPage() {
             variant="secondary"
             className="h-auto min-h-12 justify-start whitespace-normal break-words px-3 py-2 text-left text-sm font-semibold leading-tight"
             onClick={() => {
-              void handleSendToKitchen()
+              void handleSendToPrepStations()
             }}
-            disabled={isSendingKitchen || isSendingBenMarie || isSending || dispatchItems.length === 0 || !selectedTable}
+            disabled={isSendingPrep || isSending || dispatchItems.length === 0 || !selectedTable}
           >
             <UtensilsCrossed className="mr-2 h-4 w-4" />
-            {isSendingKitchen ? 'Sending...' : 'Send to Kitchen'}
-          </Button>
-
-          <Button
-            size="lg"
-            variant="secondary"
-            className="h-auto min-h-12 justify-start whitespace-normal break-words px-3 py-2 text-left text-sm font-semibold leading-tight"
-            onClick={() => {
-              void handleSendToBenMarie()
-            }}
-            disabled={isSendingBenMarie || isSendingKitchen || isSending || dispatchItems.length === 0 || !selectedTable}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            {isSendingBenMarie ? 'Sending...' : 'Send to Ben-Marie'}
+            {isSendingPrep ? 'Sending...' : 'Send Station Dockets'}
           </Button>
 
           <Button
@@ -1161,7 +1102,7 @@ export default function WaiterPage() {
                 setShowMobileHandoff(false)
               }
             }}
-            disabled={isSending || isSendingKitchen || isSendingBenMarie || dispatchItems.length === 0 || !selectedTable}
+            disabled={isSending || isSendingPrep || dispatchItems.length === 0 || !selectedTable}
           >
             {isSending ? 'Sending...' : 'Send Chair Bills to Biller (Print Bill)'}
           </Button>
