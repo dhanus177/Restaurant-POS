@@ -63,9 +63,13 @@ const emptyLedgerForm = {
   notes: '',
 }
 
+const unitOptions = ['kg', 'g', 'L', 'ml', 'pcs', 'packs', 'boxes', 'cans', 'bottles', 'heads']
+
 function createEmptyBillItem(): SupplierBillItem {
   return {
     id: crypto.randomUUID(),
+    inventoryItemId: '',
+    unit: 'pcs',
     name: '',
     quantity: 1,
     unitPrice: 0,
@@ -92,7 +96,7 @@ function getAutoReference(type: SupplierLedgerEntryType, existingEntries: Suppli
 }
 
 export function SuppliersManager() {
-  const { settings } = usePOSStore()
+  const { settings, inventory, addInventoryItem, updateInventoryItem } = usePOSStore()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -109,6 +113,8 @@ export function SuppliersManager() {
   const [ledgerSaving, setLedgerSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [formData, setFormData] = useState(emptyForm)
+
+  const NEW_INVENTORY_ITEM_OPTION = '__new__'
 
   useEffect(() => {
     void loadData()
@@ -327,8 +333,8 @@ export function SuppliersManager() {
       return
     }
 
-    if ((ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') && ledgerForm.billItems.some((item) => !item.name.trim() || item.quantity <= 0)) {
-      toast.error('Each order item needs a name and quantity')
+    if ((ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') && ledgerForm.billItems.some((item) => (!item.inventoryItemId && !item.name.trim()) || item.quantity <= 0)) {
+      toast.error('Each order item needs quantity and either an inventory item or a new item name')
       return
     }
 
@@ -363,6 +369,65 @@ export function SuppliersManager() {
       if (!res.ok) throw new Error('Failed to save supplier entry')
 
       const created = (await res.json()) as SupplierLedgerEntry
+
+      if (ledgerForm.type === 'purchase' || ledgerForm.type === 'grn') {
+        const existingSkus = new Set(inventory.map((entry) => entry.sku.toUpperCase()))
+        const makeSku = (name: string, rowIndex: number) => {
+          const base = name
+            .trim()
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 18) || 'ITEM'
+
+          let attempt = `${base}-${String(Date.now()).slice(-5)}-${rowIndex + 1}`
+          let suffix = 1
+          while (existingSkus.has(attempt)) {
+            attempt = `${base}-${String(Date.now()).slice(-5)}-${rowIndex + 1}-${suffix}`
+            suffix += 1
+          }
+          existingSkus.add(attempt)
+          return attempt
+        }
+
+        ledgerForm.billItems.forEach((lineItem, index) => {
+          const qty = Number(lineItem.quantity) || 0
+          if (qty <= 0) return
+
+          const nowIso = new Date().toISOString()
+          if (lineItem.inventoryItemId) {
+            const existingItem = inventory.find((entry) => entry.id === lineItem.inventoryItemId)
+            if (!existingItem) return
+
+            updateInventoryItem(existingItem.id, {
+              storageQuantity: (existingItem.storageQuantity ?? 0) + qty,
+              supplierId: ledgerSupplier.id,
+              costPrice: Number(lineItem.unitPrice) > 0 ? Number(lineItem.unitPrice) : existingItem.costPrice,
+              lastRestocked: nowIso,
+              unit: lineItem.unit || existingItem.unit,
+            })
+            return
+          }
+
+          const newItemName = lineItem.name.trim()
+          if (!newItemName) return
+
+          addInventoryItem({
+            id: `inv-${Date.now()}-${index}`,
+            name: newItemName,
+            sku: makeSku(newItemName, index),
+            quantity: 0,
+            storageQuantity: qty,
+            unit: lineItem.unit || 'pcs',
+            minQuantity: 1,
+            costPrice: Number(lineItem.unitPrice) || 0,
+            supplierId: ledgerSupplier.id,
+            category: 'Supplies',
+            lastRestocked: nowIso,
+          })
+        })
+      }
+
       setLedgerEntries((current) => {
         const next = [created, ...current]
         setLedgerForm((form) => ({
@@ -514,6 +579,44 @@ export function SuppliersManager() {
         amount: (current.type === 'purchase' || current.type === 'grn') ? nextAmount.toFixed(2) : current.amount,
       }
     })
+  }
+
+  function updateBillItemInventory(itemId: string, inventoryItemId: string) {
+    const selectedInventoryItem = linkedItems.find((linkedItem) => linkedItem.id === inventoryItemId)
+
+    setLedgerForm((current) => {
+      const nextItems = current.billItems.map((item) => {
+        if (item.id !== itemId) return item
+        const next = {
+          ...item,
+          inventoryItemId,
+          name: selectedInventoryItem?.name ?? item.name,
+          unit: selectedInventoryItem?.unit ?? item.unit,
+          unitPrice: selectedInventoryItem?.costPrice ?? item.unitPrice,
+        }
+
+        const quantity = Number(next.quantity) || 0
+        const unitPrice = Number(next.unitPrice) || 0
+        return {
+          ...next,
+          quantity,
+          unitPrice,
+          total: Number((quantity * unitPrice).toFixed(2)),
+        }
+      })
+
+      const nextAmount = nextItems.reduce((sum, item) => sum + item.total, 0)
+
+      return {
+        ...current,
+        billItems: nextItems,
+        amount: (current.type === 'purchase' || current.type === 'grn') ? nextAmount.toFixed(2) : current.amount,
+      }
+    })
+  }
+
+  function updateBillItemUnit(itemId: string, unit: string) {
+    updateBillItem(itemId, { unit })
   }
 
   function addBillItemRow() {
@@ -952,12 +1055,50 @@ export function SuppliersManager() {
                           <div key={item.id} className="grid gap-2 rounded-md border bg-background p-3 md:grid-cols-[minmax(0,1.7fr)_90px_110px_110px_auto] md:items-end">
                             <div className="grid gap-1.5">
                               <Label htmlFor={`bill-item-name-${item.id}`}>Item {index + 1}</Label>
-                              <Input
+                              <select
                                 id={`bill-item-name-${item.id}`}
-                                value={item.name}
-                                onChange={(e) => updateBillItem(item.id, { name: e.target.value })}
-                                placeholder="Rice bag / soft drinks carton"
-                              />
+                                className="h-10 rounded-md border bg-background px-3 text-sm"
+                                value={item.inventoryItemId || (item.name ? NEW_INVENTORY_ITEM_OPTION : '')}
+                                onChange={(e) => {
+                                  if (e.target.value === NEW_INVENTORY_ITEM_OPTION) {
+                                    updateBillItem(item.id, { inventoryItemId: '', name: '' })
+                                    return
+                                  }
+                                  updateBillItemInventory(item.id, e.target.value)
+                                }}
+                              >
+                                <option value="">Select inventory item</option>
+                                {linkedItems.map((linkedItem) => (
+                                  <option key={linkedItem.id} value={linkedItem.id}>
+                                    {linkedItem.name}
+                                  </option>
+                                ))}
+                                <option value={NEW_INVENTORY_ITEM_OPTION}>+ Create new inventory item</option>
+                              </select>
+                              {!item.inventoryItemId && (
+                                <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_120px]">
+                                  <Input
+                                    value={item.name}
+                                    onChange={(e) => updateBillItem(item.id, { inventoryItemId: '', name: e.target.value })}
+                                    placeholder="New inventory item name"
+                                  />
+                                  <select
+                                    className="h-10 rounded-md border bg-background px-3 text-sm"
+                                    value={item.unit || 'pcs'}
+                                    onChange={(e) => updateBillItemUnit(item.id, e.target.value)}
+                                  >
+                                    {unitOptions.map((unit) => (
+                                      <option key={unit} value={unit}>{unit}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {item.inventoryItemId && (
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  <span className="rounded-full border px-2 py-1">Unit: {item.unit || 'pcs'}</span>
+                                  <span className="rounded-full border px-2 py-1">Cost: {settings.currencySymbol}{item.unitPrice.toFixed(2)}</span>
+                                </div>
+                              )}
                             </div>
                             <div className="grid gap-1.5">
                               <Label htmlFor={`bill-item-qty-${item.id}`}>Qty</Label>
@@ -999,6 +1140,11 @@ export function SuppliersManager() {
                             </Button>
                           </div>
                         ))}
+                        {linkedItems.length === 0 && (
+                          <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                            No inventory items are linked to this supplier. Link inventory items to this supplier first.
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

@@ -153,6 +153,8 @@ export type SupplierPaymentMethod = 'cash' | 'cheque' | 'bank-transfer'
 
 export interface SupplierBillItem {
   id: string
+  inventoryItemId?: string | null
+  unit?: string | null
   name: string
   quantity: number
   unitPrice: number
@@ -301,4 +303,9 @@ export interface Settings {
   whatsappDinnerTime?: string
   customRoles?: RoleDefinition[]
   waiterVisibleCategoryIds?: string[]
+  billerPrinterName?: string
+  kitchenPrinterName?: string
+  takeawayPrinterName?: string
+  supplierStatementPrinterName?: string
+  forceDesktopPrintOnly?: boolean
 }

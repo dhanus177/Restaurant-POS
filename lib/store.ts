@@ -7,11 +7,15 @@ import { apiFetch } from '@/lib/api'
 // Fire-and-forget API sync – keeps optimistic UI fast
 async function dbSync(method: string, url: string, body?: unknown) {
   try {
-    await apiFetch(url, {
+    const response = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`)
+    }
   } catch (e) {
     console.error('[db-sync error]', method, url, e)
   }
@@ -35,44 +39,68 @@ import type {
   TableStatus,
   StockAdjustment,
 } from './types'
-import {
-  mockUsers,
-  mockCustomers,
-  mockCategories,
-  mockMenuItems,
-  mockTables,
-  mockOrders,
-  mockInventory,
-  mockSettings,
-  mockSuppliers,
-} from './mock-data'
+
+const DEFAULT_SETTINGS: Settings = {
+  restaurantName: 'Restaurant POS',
+  address: '',
+  phone: '',
+  taxRate: 0,
+  currency: 'LKR',
+  currencySymbol: 'Rs',
+  receiptFooter: 'Thank you for dining with us!',
+  logo: '',
+  requireCustomerBeforeOrder: false,
+  takeawayPageEnabled: true,
+  kitchenPageEnabled: true,
+  whatsappReportsEnabled: false,
+  whatsappRecipient: '',
+  whatsappBreakfastTime: '11:00',
+  whatsappLunchTime: '16:00',
+  whatsappDinnerTime: '22:00',
+  customRoles: [],
+  waiterVisibleCategoryIds: [],
+  supplierStatementPrinterName: undefined,
+  forceDesktopPrintOnly: true,
+}
 
 interface CartItem extends OrderItem {}
 
 function normalizeInventoryForApi(item: InventoryItem) {
+  const normalizedSupplierId = item.supplierId && item.supplierId.trim().length > 0
+    ? item.supplierId
+    : undefined
+
   return {
     id: item.id,
     name: item.name,
     sku: item.sku,
     quantity: item.quantity,
+    storageQuantity: item.storageQuantity ?? 0,
     unit: item.unit,
     minQuantity: item.minQuantity,
     costPrice: item.costPrice,
-    supplierId: item.supplierId,
+    supplierId: normalizedSupplierId,
     lastRestocked: item.lastRestocked,
     category: item.category,
   }
 }
 
 function normalizeInventoryPatchForApi(item: Partial<InventoryItem>) {
+  const normalizedSupplierId = item.supplierId === undefined
+    ? undefined
+    : item.supplierId && item.supplierId.trim().length > 0
+      ? item.supplierId
+      : null
+
   const patch: Partial<InventoryItem> = {
     name: item.name,
     sku: item.sku,
     quantity: item.quantity,
+    storageQuantity: item.storageQuantity,
     unit: item.unit,
     minQuantity: item.minQuantity,
     costPrice: item.costPrice,
-    supplierId: item.supplierId,
+    supplierId: normalizedSupplierId as InventoryItem['supplierId'],
     lastRestocked: item.lastRestocked,
     category: item.category,
   }
@@ -126,6 +154,7 @@ interface POSStore {
   orders: Order[]
   orderNumber: number
   addOrder: (order: Order) => void
+  updateOrder: (id: string, order: Partial<Order>) => void
   updateOrderStatus: (id: string, status: OrderStatus) => void
   updateOrderPayment: (id: string, paymentMethod: Order['paymentMethod'], paymentStatus: Order['paymentStatus'], paymentCollectedBy?: string) => void
   getNextOrderNumber: () => number
@@ -176,8 +205,8 @@ export const usePOSStore = create<POSStore>()(
     (set, get) => ({
       // Auth
       currentUser: null,
-      users: mockUsers,
-      customers: mockCustomers,
+      users: [],
+      customers: [],
       selectedCustomer: null,
       setCurrentUser: (user) => set({ currentUser: user }),
       addUser: async (user) => {
@@ -350,8 +379,8 @@ const response = await apiFetch('/api/auth/me', {
       },
 
       // Menu
-      categories: mockCategories,
-      menuItems: mockMenuItems,
+      categories: [],
+      menuItems: [],
       addCategory: (category) => {
         set((state) => ({ categories: [...state.categories, category] }))
         dbSync('POST', '/api/categories', category)
@@ -431,11 +460,15 @@ const response = await apiFetch('/api/auth/me', {
       setCurrentCustomerCount: (count) => set({ currentCustomerCount: Math.max(1, count) }),
 
       // Orders
-      orders: mockOrders,
-      orderNumber: 103,
+      orders: [],
+      orderNumber: 1,
       addOrder: (order) => {
         set((state) => ({ orders: [...state.orders, order], orderNumber: state.orderNumber + 1 }))
         dbSync('POST', '/api/orders', order)
+      },
+      updateOrder: (id, orderData) => {
+        set((state) => ({ orders: state.orders.map((o) => (o.id === id ? { ...o, ...orderData, updatedAt: new Date().toISOString() } : o)) }))
+        dbSync('PATCH', `/api/orders/${id}`, orderData)
       },
       updateOrderStatus: (id, status) => {
         set((state) => ({ orders: state.orders.map((o) => (o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o)) }))
@@ -454,7 +487,7 @@ const response = await apiFetch('/api/auth/me', {
       },
 
       // Tables
-      tables: mockTables,
+      tables: [],
       addTable: (table) => {
         set((state) => ({ tables: [...state.tables, table] }))
         dbSync('POST', '/api/tables', table)
@@ -473,8 +506,8 @@ const response = await apiFetch('/api/auth/me', {
       },
 
       // Inventory
-      inventory: mockInventory,
-      suppliers: mockSuppliers,
+      inventory: [],
+      suppliers: [],
       cashDrawer: null,
       cashDrawerExpenses: [],
       cashDrawerReports: [],
@@ -548,18 +581,18 @@ const response = await apiFetch('/api/auth/me', {
           }
         })
 
-        // Keep DB sync compatible with current schema (daily inventory only)
-        if (adjustment.type !== 'transfer' && (adjustment.location ?? 'inventory') === 'inventory') {
-          dbSync('POST', '/api/stock-adjustments', {
-            id: adjustment.id,
-            inventoryItemId: adjustment.inventoryItemId,
-            type: adjustment.type,
-            quantity: adjustment.quantity,
-            reason: adjustment.reason,
-            createdAt: adjustment.createdAt,
-            createdBy: adjustment.createdBy,
-          })
-        }
+        dbSync('POST', '/api/stock-adjustments', {
+          id: adjustment.id,
+          inventoryItemId: adjustment.inventoryItemId,
+          type: adjustment.type,
+          quantity: adjustment.quantity,
+          location: adjustment.location,
+          fromLocation: adjustment.fromLocation,
+          toLocation: adjustment.toLocation,
+          reason: adjustment.reason,
+          createdAt: adjustment.createdAt,
+          createdBy: adjustment.createdBy,
+        })
       },
       addSupplier: (supplier) => {
         set((state) => ({ suppliers: [...state.suppliers, supplier] }))
@@ -631,7 +664,7 @@ const response = await apiFetch('/api/auth/me', {
       },
 
       // Settings
-      settings: mockSettings,
+      settings: DEFAULT_SETTINGS,
       updateSettings: (settingsData) => {
         set((state) => ({ settings: { ...state.settings, ...settingsData } }))
         dbSync('PATCH', '/api/settings', settingsData)
@@ -658,14 +691,38 @@ const response = await apiFetch('/api/auth/me', {
               apiFetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null))),
             ])
           const currentInventory = get().inventory
-          const incomingInventory: InventoryItem[] = Array.isArray(inventory)
-            ? inventory.map((item: InventoryItem) => {
-                const existing = currentInventory.find((i) => i.id === item.id)
-                return {
-                  ...item,
-                  storageQuantity: item.storageQuantity ?? existing?.storageQuantity ?? 0,
-                }
-              })
+          const inventoryRows = Array.isArray(inventory)
+            ? inventory
+            : Array.isArray((inventory as any)?.items)
+              ? (inventory as any).items
+              : Array.isArray((inventory as any)?.data)
+                ? (inventory as any).data
+                : []
+
+          const incomingInventory: InventoryItem[] = inventoryRows.length > 0
+            ? inventoryRows
+                .map((row: any) => {
+                  const id = row?.id
+                  const name = row?.name
+                  const sku = row?.sku
+                  if (!id || !name || !sku) return null
+
+                  const existing = currentInventory.find((i) => i.id === id)
+                  return {
+                    id: String(id),
+                    name: String(name),
+                    sku: String(sku),
+                    quantity: Number(row?.quantity ?? 0),
+                    storageQuantity: Number(row?.storageQuantity ?? row?.storage_quantity ?? existing?.storageQuantity ?? 0),
+                    unit: String(row?.unit ?? existing?.unit ?? 'pcs'),
+                    minQuantity: Number(row?.minQuantity ?? row?.min_quantity ?? existing?.minQuantity ?? 0),
+                    costPrice: Number(row?.costPrice ?? row?.cost_price ?? existing?.costPrice ?? 0),
+                    supplierId: row?.supplierId ?? row?.supplier_id ?? existing?.supplierId,
+                    lastRestocked: row?.lastRestocked ?? row?.last_restocked ?? existing?.lastRestocked,
+                    category: String(row?.category ?? existing?.category ?? 'General'),
+                  } satisfies InventoryItem
+                })
+                .filter((item: InventoryItem | null): item is InventoryItem => Boolean(item))
             : currentInventory
 
           const mergedAdjustments = (() => {
@@ -679,6 +736,10 @@ const response = await apiFetch('/api/auth/me', {
           })()
 
           const incomingCustomers: Customer[] = Array.isArray(customers) ? customers : get().customers
+          const incomingOrders: Order[] = Array.isArray(orders) ? orders : get().orders
+          const nextOrderNumber = incomingOrders.length
+            ? Math.max(...incomingOrders.map((order) => order.orderNumber)) + 1
+            : 1
           const currentSelectedCustomerId = get().selectedCustomer?.id
           const syncedSelectedCustomer = currentSelectedCustomerId
             ? incomingCustomers.find((customer) => customer.id === currentSelectedCustomerId) ?? null
@@ -691,14 +752,15 @@ const response = await apiFetch('/api/auth/me', {
             categories: Array.isArray(categories) ? categories : get().categories,
             menuItems: Array.isArray(menuItems) ? menuItems : get().menuItems,
             tables: Array.isArray(tables) ? tables : get().tables,
-            orders: Array.isArray(orders) ? orders : get().orders,
+            orders: incomingOrders,
+            orderNumber: nextOrderNumber,
             inventory: incomingInventory,
             suppliers: Array.isArray(suppliers) ? suppliers : get().suppliers,
             cashDrawer: cashDrawer && !cashDrawer.error ? cashDrawer : get().cashDrawer,
             cashDrawerExpenses: Array.isArray(cashDrawerExpenses) ? cashDrawerExpenses : get().cashDrawerExpenses,
             cashDrawerReports: Array.isArray(cashDrawerReports) ? cashDrawerReports : get().cashDrawerReports,
             stockAdjustments: mergedAdjustments,
-            settings: settings && !settings.error ? settings : get().settings,
+            settings: settings && !settings.error ? { ...DEFAULT_SETTINGS, ...settings } : DEFAULT_SETTINGS,
           })
         } catch (e) {
           console.error('[loadFromDB error]', e)
@@ -769,6 +831,27 @@ const response = await apiFetch('/api/auth/me', {
     }),
     {
       name: 'pos-storage',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Partial<POSStore>
+        return {
+          ...state,
+          users: [],
+          customers: [],
+          categories: [],
+          menuItems: [],
+          orders: [],
+          orderNumber: 1,
+          tables: [],
+          inventory: [],
+          suppliers: [],
+          cashDrawer: null,
+          cashDrawerExpenses: [],
+          cashDrawerReports: [],
+          stockAdjustments: [],
+          settings: DEFAULT_SETTINGS,
+        }
+      },
       partialize: (state) => ({
         users: state.users,
         customers: state.customers,
