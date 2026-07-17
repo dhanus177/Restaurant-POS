@@ -22,6 +22,52 @@ export function generateBillCode(orderNumber: number, createdAt: string | Date):
   return `BILL-${y}${m}${day}-${String(orderNumber).padStart(4, '0')}`
 }
 
+export function generateKitchenOrderCode(orderNumber: number, createdAt: string | Date): string {
+  const d = new Date(createdAt)
+  const y = d.getFullYear().toString().slice(-2)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `KOT-${y}${m}${day}-${String(orderNumber).padStart(4, '0')}`
+}
+
+export function generateBenMarieOrderCode(orderNumber: number, createdAt: string | Date): string {
+  const d = new Date(createdAt)
+  const y = d.getFullYear().toString().slice(-2)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `BMT-${y}${m}${day}-${String(orderNumber).padStart(4, '0')}`
+}
+
+export function normalizeBillScanInput(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+export function normalizeKitchenScanInput(value: string): string {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
+export function matchesBillScanInput(orderNumber: number, createdAt: string | Date, scanValue: string): boolean {
+  const normalized = normalizeBillScanInput(scanValue)
+  if (!normalized) return false
+
+  const billCode = generateBillCode(orderNumber, createdAt)
+  const billCodeCompact = billCode.replace(/[^A-Z0-9]/g, '')
+  const billDigits = billCode.replace(/\D/g, '')
+
+  return normalized === billCodeCompact || normalized === billDigits || normalized === String(orderNumber)
+}
+
+export function matchesKitchenScanInput(orderNumber: number, createdAt: string | Date, scanValue: string): boolean {
+  const normalized = normalizeKitchenScanInput(scanValue)
+  if (!normalized) return false
+
+  const kitchenCode = generateKitchenOrderCode(orderNumber, createdAt)
+  const kitchenCodeCompact = kitchenCode.replace(/[^A-Z0-9]/g, '')
+  const kitchenDigits = kitchenCode.replace(/\D/g, '')
+
+  return normalized === kitchenCodeCompact || normalized === kitchenDigits || normalized === String(orderNumber)
+}
+
 export function generateBarcodeSVG(code: string): string {
   const code128Value = code.toUpperCase().replace(/\s+/g, '')
   const billMatch = code128Value.match(/^BILL-(\d{6})-(\d{4})$/)
@@ -343,15 +389,20 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
 }
 
 export function generateKitchenDocketHTML(order: Order, settings: Settings): string {
+  const kitchenCode = generateKitchenOrderCode(order.orderNumber, order.createdAt)
   const isTakeaway = !order.tableId
   const orderKindLabel = isTakeaway ? 'TAKEAWAY ORDER' : 'TABLE ORDER'
   const stationLabel = isTakeaway ? 'TAKEAWAY KITCHEN' : 'TABLE KITCHEN'
+  const prepCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
   const itemsHTML = order.items
     .map(
       (item) => `
     <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
       <div style="font-size: 20px; font-weight: bold;">
         ${item.quantity}x ${item.name}
+        <div style="display: inline-block; font-size: 11px; margin-top: 4px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #111; background: #f5f5f5;">
+          [${(item.prepStation ?? 'kitchen').toUpperCase().replace('-', ' ')}]
+        </div>
         ${item.chairNumber ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">Chair ${item.chairNumber}</div>` : ''}
       </div>
       ${item.modifiers.length > 0 ? `<div style="font-size: 16px; margin-top: 5px; color: #333;">+ ${item.modifiers.map(m => m.name).join(', ')}</div>` : ''}
@@ -382,9 +433,14 @@ export function generateKitchenDocketHTML(order: Order, settings: Settings): str
         .order-kind { font-size: 16px; font-weight: 700; letter-spacing: 0.12em; margin-top: 6px; }
         .table-info { font-size: 24px; margin-top: 10px; }
         .station { font-size: 15px; margin-top: 4px; font-weight: 700; }
+        .prep-count { font-size: 14px; margin-top: 6px; font-weight: 700; letter-spacing: 0.04em; }
         .time { font-size: 16px; color: #666; margin-top: 5px; }
         .priority { background: #f00; color: #fff; padding: 5px 10px; font-weight: bold; display: inline-block; margin-top: 10px; }
         .items { margin-top: 20px; }
+        .confirm { margin-top: 16px; border-top: 1px dashed #999; padding-top: 10px; text-align: center; }
+        .confirm .label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #444; }
+        .confirm .code { font-size: 14px; font-weight: 700; margin-top: 4px; }
+        .confirm .tip { font-size: 11px; color: #555; margin-top: 6px; }
       </style>
     </head>
     <body>
@@ -393,12 +449,19 @@ export function generateKitchenDocketHTML(order: Order, settings: Settings): str
         <div class="order-kind">${orderKindLabel}</div>
         ${order.tableName ? `<div class="table-info">${order.tableName}</div>` : '<div class="table-info">TAKEAWAY PARCEL</div>'}
         <div class="station">${stationLabel}</div>
+        <div class="prep-count">Prep Count: ${prepCount}</div>
         <div class="time">${formatTime(order.createdAt)}</div>
         ${order.isPriority ? '<div class="priority">RUSH ORDER</div>' : ''}
       </div>
       
       <div class="items">
         ${itemsHTML}
+      </div>
+
+      <div class="confirm">
+        <div class="label">Kitchen Confirmation</div>
+        <div class="code">${kitchenCode}</div>
+        <div class="tip">Use KOT code or Order # for kitchen confirmation.</div>
       </div>
     </body>
     </html>
@@ -407,12 +470,15 @@ export function generateKitchenDocketHTML(order: Order, settings: Settings): str
 
 export function generateTakeawayDocketHTML(order: Order, settings: Settings): string {
   const billCode = generateBillCode(order.orderNumber, order.createdAt)
-  const barcodeSvg = generateBarcodeSVG(billCode)
+  const prepCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
   const itemsHTML = order.items
     .map(
       (item) => `
     <div style="margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
       <div style="font-size: 18px; font-weight: 700;">${item.quantity}x ${item.name}</div>
+      <div style="display: inline-block; font-size: 11px; margin-top: 4px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #111; background: #f5f5f5;">
+        [${(item.prepStation ?? 'kitchen').toUpperCase().replace('-', ' ')}]
+      </div>
       ${item.chairNumber ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">Chair ${item.chairNumber}</div>` : ''}
       ${item.modifiers.length > 0 ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">+ ${item.modifiers.map((m) => m.name).join(', ')}</div>` : ''}
       ${item.notes ? `<div style="font-size: 14px; margin-top: 4px; color: #b00020; font-weight: 600;">Note: ${item.notes}</div>` : ''}
@@ -443,8 +509,8 @@ export function generateTakeawayDocketHTML(order: Order, settings: Settings): st
         .parcel { font-size: 16px; font-weight: 800; letter-spacing: 0.12em; margin-top: 4px; }
         .meta { font-size: 13px; color: #444; margin-top: 4px; }
         .bill { font-size: 13px; font-weight: 700; margin-top: 4px; }
+        .prep-count { font-size: 13px; font-weight: 800; margin-top: 4px; }
         .section-title { margin-top: 10px; margin-bottom: 8px; font-weight: 700; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
-        .barcode { margin-top: 12px; }
       </style>
     </head>
     <body>
@@ -454,12 +520,91 @@ export function generateTakeawayDocketHTML(order: Order, settings: Settings): st
         <div class="parcel">TAKEAWAY PARCEL</div>
         <div class="meta">TAKEAWAY · ${formatDateTime(order.createdAt)}</div>
         <div class="bill">Bill No: ${billCode}</div>
+        <div class="prep-count">Prep Count: ${prepCount}</div>
         <div class="bill">Order Details</div>
       </div>
 
       <div class="section-title">Order Details</div>
       ${itemsHTML}
-      <div class="barcode">${barcodeSvg}</div>
+    </body>
+    </html>
+  `
+}
+
+export function generateBenMarieDocketHTML(order: Order, settings: Settings): string {
+  const benMarieCode = generateBenMarieOrderCode(order.orderNumber, order.createdAt)
+  const isTakeaway = !order.tableId
+  const orderKindLabel = isTakeaway ? 'TAKEAWAY ORDER' : 'TABLE ORDER'
+  const prepCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
+  const itemsHTML = order.items
+    .map(
+      (item) => `
+    <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
+      <div style="font-size: 20px; font-weight: bold;">
+        ${item.quantity}x ${item.name}
+        <div style="display: inline-block; font-size: 11px; margin-top: 4px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #111; background: #f5f5f5;">
+          [${(item.prepStation ?? 'ben-marie').toUpperCase().replace('-', ' ')}]
+        </div>
+        ${item.chairNumber ? `<div style="font-size: 14px; margin-top: 4px; color: #444;">Chair ${item.chairNumber}</div>` : ''}
+      </div>
+      ${item.modifiers.length > 0 ? `<div style="font-size: 16px; margin-top: 5px; color: #333;">+ ${item.modifiers.map(m => m.name).join(', ')}</div>` : ''}
+      ${item.notes ? `<div style="font-size: 16px; margin-top: 5px; color: #c00; font-weight: bold;">** ${item.notes} **</div>` : ''}
+    </div>
+  `
+    )
+    .join('')
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Ben-Marie Docket #${order.orderNumber}</title>
+      <style>
+        @page { size: auto; margin: 0; }
+        html, body { height: auto; }
+        body {
+          font-family: 'Arial', sans-serif;
+          width: auto;
+          max-width: 72mm;
+          margin: 0 auto;
+          padding: 6mm 4mm;
+          box-sizing: border-box;
+        }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }
+        .order-number { font-size: 48px; font-weight: bold; }
+        .order-kind { font-size: 16px; font-weight: 700; letter-spacing: 0.12em; margin-top: 6px; }
+        .table-info { font-size: 24px; margin-top: 10px; }
+        .station { font-size: 15px; margin-top: 4px; font-weight: 700; }
+        .prep-count { font-size: 14px; margin-top: 6px; font-weight: 700; letter-spacing: 0.04em; }
+        .time { font-size: 16px; color: #666; margin-top: 5px; }
+        .priority { background: #f00; color: #fff; padding: 5px 10px; font-weight: bold; display: inline-block; margin-top: 10px; }
+        .items { margin-top: 20px; }
+        .confirm { margin-top: 16px; border-top: 1px dashed #999; padding-top: 10px; text-align: center; }
+        .confirm .label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #444; }
+        .confirm .code { font-size: 14px; font-weight: 700; margin-top: 4px; }
+        .confirm .tip { font-size: 11px; color: #555; margin-top: 6px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="order-number">#${order.orderNumber}</div>
+        <div class="order-kind">${orderKindLabel}</div>
+        ${order.tableName ? `<div class="table-info">${order.tableName}</div>` : '<div class="table-info">TAKEAWAY PARCEL</div>'}
+        <div class="station">BEN-MARIE STATION</div>
+        <div class="prep-count">Prep Count: ${prepCount}</div>
+        <div class="time">${formatTime(order.createdAt)}</div>
+        ${order.isPriority ? '<div class="priority">RUSH ORDER</div>' : ''}
+      </div>
+
+      <div class="items">
+        ${itemsHTML}
+      </div>
+
+      <div class="confirm">
+        <div class="label">Ben-Marie Confirmation</div>
+        <div class="code">${benMarieCode}</div>
+        <div class="tip">Use BMT code or Order # for station confirmation.</div>
+      </div>
     </body>
     </html>
   `
@@ -551,8 +696,7 @@ export function printDocument(
   }
 
   if (options?.forceDesktopOnly) {
-    console.error('[desktop print error] Desktop printing is required, but the desktop bridge is not available.')
-    return
+    console.warn('[desktop print warning] Desktop printing requested, but desktop bridge is unavailable. Falling back to browser print dialog.')
   }
 
   browserPrint()
@@ -564,13 +708,42 @@ export function printReceipt(order: Order, settings: Settings): void {
 }
 
 export function printKitchenDocket(order: Order, settings: Settings): void {
-  const html = generateKitchenDocketHTML(order, settings)
-  printDocument(html, settings.kitchenPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  if (order.items.length === 0) {
+    return
+  }
+
+  const html = generateKitchenDocketHTML(
+    {
+      ...order,
+      items: order.items,
+    },
+    settings
+  )
+  printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
 export function printTakeawayDocket(order: Order, settings: Settings): void {
   const html = generateTakeawayDocketHTML(order, settings)
   printDocument(html, settings.takeawayPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+}
+
+export function printBenMarieDocket(order: Order, settings: Settings): void {
+  const benMarieItems = order.items.filter((item) => item.prepStation === 'ben-marie')
+
+  if (benMarieItems.length === 0) {
+    return
+  }
+
+  const html = generateBenMarieDocketHTML(
+    {
+      ...order,
+      items: benMarieItems,
+    },
+    settings
+  )
+
+  // Uses cash counter printer route as requested workflow for dockets.
+  printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
 export function generateSupplierStatementHTML(

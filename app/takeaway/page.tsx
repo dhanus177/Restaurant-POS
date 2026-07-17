@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { generateBillCode, printTakeawayDocket } from '@/lib/print'
+import { generateBillCode, matchesBillScanInput, printTakeawayDocket } from '@/lib/print'
 import { Check, Search, ShoppingBag, ReceiptText, ScanBarcode } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function TakeawayPage() {
   const router = useRouter()
@@ -64,24 +65,61 @@ export default function TakeawayPage() {
     [orders]
   )
 
+  const takeawayLookupOrder = useMemo(() => {
+    const q = (scanCode || query).trim().toLowerCase()
+    if (!q) return null
+
+    return (
+      orders
+        .filter((o) => !o.tableId && o.status !== 'cancelled')
+        .find((o) => {
+          return String(o.orderNumber).includes(q) || matchesBillScanInput(o.orderNumber, o.createdAt, q)
+        }) ?? null
+    )
+  }, [orders, query, scanCode])
+
   const filtered = useMemo(() => {
     const q = (scanCode || query).trim().toLowerCase()
     if (!q) return pendingTakeawayOrders
 
     return pendingTakeawayOrders.filter((o) => {
-      const billCode = generateBillCode(o.orderNumber, o.createdAt).toLowerCase()
-      return String(o.orderNumber).includes(q) || billCode.includes(q)
+      return String(o.orderNumber).includes(q) || matchesBillScanInput(o.orderNumber, o.createdAt, q)
     })
   }, [query, scanCode, pendingTakeawayOrders])
 
   const handleScanLookup = (value: string) => {
     const normalized = value.trim()
     setScanCode(normalized)
+
+    const match = orders
+      .filter((o) => !o.tableId && o.status !== 'cancelled')
+      .find((o) => matchesBillScanInput(o.orderNumber, o.createdAt, normalized))
+
+    if (!match) return
+
+    if (match.paymentStatus === 'paid') {
+      setSelectedPendingBillId(null)
+
+      if (match.status === 'completed') {
+        toast.info(`Takeaway order #${match.orderNumber} is already completed`)
+        return
+      }
+
+      if (confirm(`Scan matched paid takeaway #${match.orderNumber}. Complete this order now?`)) {
+        handleCompleteTakeaway(match.id, match.orderNumber, { skipConfirm: true })
+      }
+      return
+    }
+
+    if (match.paymentStatus === 'pending') {
+      setSelectedPendingBillId(match.id)
+    }
   }
 
-  const handleCompleteTakeaway = (orderId: string, orderNumber: number) => {
-    if (!confirm(`Mark takeaway order #${orderNumber} as completed?`)) return
+  const handleCompleteTakeaway = (orderId: string, orderNumber: number, options?: { skipConfirm?: boolean }) => {
+    if (!options?.skipConfirm && !confirm(`Mark takeaway order #${orderNumber} as completed?`)) return
     updateOrderStatus(orderId, 'completed')
+    toast.success(`Takeaway order #${orderNumber} completed`)
   }
 
   const handleSelectTakeawayBill = (orderId: string) => {
@@ -185,12 +223,75 @@ export default function TakeawayPage() {
           </Card>
         </div>
 
+        {takeawayLookupOrder ? (
+          <Card className="mb-4 border-orange-300 shadow-sm ring-1 ring-orange-200 dark:border-orange-900/40 dark:ring-orange-900/30">
+            <CardHeader className="bg-orange-100/70 dark:bg-card/70">
+              <CardTitle className="flex items-center justify-between gap-3 text-lg">
+                <span className="inline-flex items-center gap-2">
+                  <ScanBarcode className="h-5 w-5 text-orange-700 dark:text-orange-300" />
+                  Scanned takeaway bill found
+                </span>
+                <Badge variant={takeawayLookupOrder.paymentStatus === 'paid' ? 'secondary' : 'outline'} className="capitalize">
+                  {takeawayLookupOrder.paymentStatus}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <span>Order #{takeawayLookupOrder.orderNumber}</span>
+                <span className="font-mono text-xs">{generateBillCode(takeawayLookupOrder.orderNumber, takeawayLookupOrder.createdAt)}</span>
+              </div>
+              <div className="rounded-xl bg-orange-50 p-4 dark:bg-muted/30">
+                <p className="text-xs uppercase tracking-[0.2em] text-orange-700 dark:text-orange-300">
+                  {takeawayLookupOrder.paymentStatus === 'paid' ? 'Paid total' : 'Amount due'}
+                </p>
+                <div className="mt-1 text-3xl font-black text-foreground">
+                  {settings.currencySymbol}{takeawayLookupOrder.total.toFixed(2)}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
+                {takeawayLookupOrder.status === 'completed'
+                  ? 'This order was already completed.'
+                  : takeawayLookupOrder.paymentStatus === 'paid'
+                  ? 'This order is paid and ready to be completed.'
+                  : 'This order is pending payment and can be printed for handover.'}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {takeawayLookupOrder.paymentStatus === 'paid' && takeawayLookupOrder.status !== 'completed' ? (
+                  <Button
+                    className="h-11 w-full gap-2 sm:w-auto"
+                    size="lg"
+                    onClick={() => handleCompleteTakeaway(takeawayLookupOrder.id, takeawayLookupOrder.orderNumber)}
+                  >
+                    <Check className="h-4 w-4" />
+                    Complete Order
+                  </Button>
+                ) : takeawayLookupOrder.status === 'completed' ? (
+                  <Button className="h-11 w-full gap-2 sm:w-auto" variant="secondary" size="lg" disabled>
+                    <Check className="h-4 w-4" />
+                    Already Completed
+                  </Button>
+                ) : (
+                  <Button
+                    className="h-11 w-full gap-2 sm:w-auto"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => handleSelectTakeawayBill(takeawayLookupOrder.id)}
+                  >
+                    <ReceiptText className="h-4 w-4" />
+                    Print Docket
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold">Pending Takeaway Bills</h2>
             <p className="text-sm text-muted-foreground">Track takeaway bills by order number or bill code.</p>
           </div>
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/pay')}>Go to Pay Counter</Button>
         </div>
 
         {filtered.length === 0 ? (
@@ -225,7 +326,7 @@ export default function TakeawayPage() {
                       <div className="mt-1 text-3xl font-black text-foreground">{settings.currencySymbol}{order.total.toFixed(2)}</div>
                     </div>
                     <div className="rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground">
-                      Payment handled at pay counter.
+                      Payment handled at cashier.
                     </div>
                     <Button
                       className="h-10 w-full"

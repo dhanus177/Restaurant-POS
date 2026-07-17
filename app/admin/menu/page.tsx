@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState } from 'react'
 import { usePOSStore } from '@/lib/store'
 import { Button } from '@/components/ui/button'
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Upload, X, Image as ImageIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import type { MenuItem } from '@/lib/types'
 
@@ -51,6 +52,7 @@ export default function MenuManagementPage() {
     isAvailable: true,
     applyServiceCharge: false,
     prepStation: 'kitchen' as 'kitchen' | 'ben-marie',
+    image: '',
   })
 
   const filteredItems = menuItems.filter((item) => {
@@ -69,6 +71,7 @@ export default function MenuManagementPage() {
       isAvailable: item.isAvailable,
       applyServiceCharge: item.applyServiceCharge ?? false,
       prepStation: item.prepStation ?? 'kitchen',
+      image: item.image ?? '',
     })
     setShowForm(true)
   }
@@ -83,6 +86,7 @@ export default function MenuManagementPage() {
       isAvailable: true,
       applyServiceCharge: false,
       prepStation: 'kitchen',
+      image: '',
     })
     setShowForm(true)
   }
@@ -288,6 +292,61 @@ export default function MenuManagementPage() {
               />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid gap-2 sm:col-span-2">
+                <Label>Item Picture</Label>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  {formData.image ? (
+                    <div className="relative h-24 w-24 overflow-hidden rounded-lg border bg-muted">
+                      <Image
+                        src={formData.image}
+                        alt={formData.name || 'Menu item'}
+                        fill
+                        className="object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, image: '' })}
+                        className="absolute right-0.5 top-0.5 rounded-full bg-destructive p-0.5 text-destructive-foreground"
+                        aria-label="Remove image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted text-muted-foreground">
+                      <ImageIcon className="h-8 w-8 opacity-40" />
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <Label
+                      htmlFor="item-image-upload"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-accent"
+                    >
+                      <Upload className="h-4 w-4" />
+                      {formData.image ? 'Replace Picture' : 'Upload Picture'}
+                    </Label>
+                    <Input
+                      id="item-image-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = (ev) => {
+                          setFormData({ ...formData, image: (ev.target?.result as string) ?? '' })
+                        }
+                        reader.readAsDataURL(file)
+                        e.target.value = ''
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">PNG, JPG, SVG up to 2 MB</p>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid gap-2">
                 <Label htmlFor="price">Price</Label>
                 <Input

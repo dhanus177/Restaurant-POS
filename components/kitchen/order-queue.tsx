@@ -57,28 +57,28 @@ export function OrderQueue() {
     <div className="h-full flex flex-col">
       <Tabs defaultValue="all" className="flex-1 flex flex-col">
         <div className="border-b border-border px-3 py-2 sm:px-4">
-          <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap">
+          <TabsList className="w-full justify-start overflow-x-auto whitespace-nowrap bg-muted/70 dark:bg-muted/40">
             <TabsTrigger value="all" className="gap-2">
               All
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
                 {activeOrders.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="pending" className="gap-2">
               New
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
                 {pendingOrders.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="preparing" className="gap-2">
               Preparing
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
                 {preparingOrders.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="ready" className="gap-2">
               Ready
-              <Badge variant="secondary" className="ml-1">
+              <Badge variant="secondary" className="ml-1 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100">
                 {readyOrders.length}
               </Badge>
             </TabsTrigger>

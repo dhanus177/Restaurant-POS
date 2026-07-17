@@ -47,11 +47,11 @@ export default function StaffManagementPage() {
   const [formData, setFormData] = useState({
     name: '',
     pin: '',
-    role: 'cashier' as Role,
+    role: 'biller' as Role,
   })
   const [roleForm, setRoleForm] = useState({
     name: '',
-    baseRole: 'cashier' as Exclude<BuiltInRole, 'super-admin'>,
+    baseRole: 'biller' as Exclude<BuiltInRole, 'super-admin'>,
   })
   const canManageSuperAdmins = currentUser?.role === 'super-admin'
   const customRoles = settings.customRoles ?? []
@@ -94,7 +94,7 @@ export default function StaffManagementPage() {
     setFormData({
       name: '',
       pin: '',
-      role: 'cashier',
+      role: 'biller',
     })
     setShowForm(true)
   }
@@ -103,7 +103,7 @@ export default function StaffManagementPage() {
     setSelectedRole(null)
     setRoleForm({
       name: '',
-      baseRole: 'cashier',
+      baseRole: 'biller',
     })
     setShowRoleForm(true)
   }
@@ -112,7 +112,7 @@ export default function StaffManagementPage() {
     setSelectedRole(role)
     setRoleForm({
       name: role.name,
-      baseRole: role.baseRole === 'super-admin' ? 'cashier' : role.baseRole,
+      baseRole: role.baseRole === 'super-admin' ? 'biller' : role.baseRole,
     })
     setShowRoleForm(true)
   }
@@ -272,12 +272,12 @@ export default function StaffManagementPage() {
         return 'bg-violet-600 text-white'
       case 'admin':
         return 'bg-primary text-primary-foreground'
+      case 'biller':
+        return 'bg-indigo-600 text-white dark:bg-indigo-500 dark:text-slate-950'
       case 'cashier':
-        return 'bg-chart-2 text-chart-2-foreground'
+        return 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
       case 'kitchen':
         return 'bg-warning text-warning-foreground'
-      case 'pay-counter':
-        return 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-slate-950'
       case 'takeaway':
         return 'bg-orange-600 text-white dark:bg-orange-500 dark:text-slate-950'
       case 'waiter':

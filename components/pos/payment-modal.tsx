@@ -1,17 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { usePOSStore } from '@/lib/store'
 import { Banknote, CreditCard, CheckCircle2, Printer } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Order, PaymentMethod } from '@/lib/types'
-import { printReceipt, printTakeawayDocket } from '@/lib/print'
+import { printKitchenDocket, printReceipt, printTakeawayDocket } from '@/lib/print'
 
 interface PaymentModalProps {
   open: boolean
@@ -65,6 +66,7 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
   const cashAmount = parseFloat(cashReceived) || 0
   const change = cashAmount - total
   const chairSummary = groupChairSummary(order)
+  const isCashierTakeawayFlow = Boolean(order && !order.tableId)
 
   const handlePayment = async () => {
     if (paymentMethod === 'cash' && cashAmount < total) {
@@ -79,19 +81,20 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
 
     if (order) {
       updateOrderPayment(order.id, paymentMethod, 'paid', currentUser?.name || 'Unknown')
-      setCompletedOrder({ ...order, paymentMethod, paymentStatus: 'paid', paymentCollectedBy: currentUser?.name || 'Unknown' })
+      const paidOrder: Order = {
+        ...order,
+        paymentMethod,
+        paymentStatus: 'paid',
+        paymentCollectedBy: currentUser?.name || 'Unknown',
+      }
+
+      setCompletedOrder(paidOrder)
       setIsComplete(true)
       setIsProcessing(false)
       if (!order.tableId) {
-        printTakeawayDocket(
-          {
-            ...order,
-            paymentMethod,
-            paymentStatus: 'paid',
-            paymentCollectedBy: currentUser?.name || 'Unknown',
-          },
-          settings
-        )
+        // Cashier takeaway flow: print kitchen docket + takeaway docket immediately.
+        printKitchenDocket(paidOrder, settings)
+        printTakeawayDocket(paidOrder, settings)
       }
       toast.success(`Bill #${order.orderNumber} paid successfully!`)
       return
@@ -126,8 +129,14 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
     setIsComplete(true)
     setIsProcessing(false)
 
-    // Auto-print final bill receipt only
-    printReceipt(newOrder, settings)
+    if (!newOrder.tableId) {
+      // Cashier takeaway flow: print kitchen docket + takeaway docket immediately.
+      printKitchenDocket(newOrder, settings)
+      printTakeawayDocket(newOrder, settings)
+    } else {
+      // Dine-in counter flow keeps bill printing.
+      printReceipt(newOrder, settings)
+    }
 
     toast.success(`Order #${orderNumber} placed successfully!`)
   }
@@ -169,6 +178,11 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
           <DialogTitle>
             {isComplete ? 'Payment Complete' : 'Process Payment'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {isComplete
+              ? 'Payment completed. You can print the final bill or return to continue operations.'
+              : 'Choose payment method and complete cashier payment for this order.'}
+          </DialogDescription>
         </DialogHeader>
 
         {isComplete ? (
@@ -193,12 +207,14 @@ export function PaymentModal({ open, onClose, onComplete, order }: PaymentModalP
             )}
 
             <div className="flex flex-col gap-3">
-              <Button variant="outline" onClick={handlePrintReceipt} className="gap-2">
-                <Printer className="h-4 w-4" />
-                Print Final Bill
-              </Button>
+              {!isCashierTakeawayFlow && (
+                <Button variant="outline" onClick={handlePrintReceipt} className="gap-2">
+                  <Printer className="h-4 w-4" />
+                  Print Final Bill
+                </Button>
+              )}
               <Button onClick={handleNewOrder} className="gap-2">
-                {order ? 'Back to Pay Counter' : 'Start New Order'}
+                {order ? 'Back to Cashier' : 'Start New Order'}
               </Button>
             </div>
           </div>

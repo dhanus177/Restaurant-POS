@@ -3,6 +3,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { apiFetch } from '@/lib/api'
+import { normalizeRoleId } from '@/lib/roles'
 
 // Fire-and-forget API sync – keeps optimistic UI fast
 async function dbSync(method: string, url: string, body?: unknown) {
@@ -63,7 +64,11 @@ const DEFAULT_SETTINGS: Settings = {
   forceDesktopPrintOnly: true,
 }
 
-interface CartItem extends OrderItem {}
+interface CartItem extends OrderItem {
+  tableId?: string
+  kitchenSentAt?: string | null
+  benMarieSentAt?: string | null
+}
 
 function normalizeInventoryForApi(item: InventoryItem) {
   const normalizedSupplierId = item.supplierId && item.supplierId.trim().length > 0
@@ -146,6 +151,7 @@ interface POSStore {
   removeFromCart: (itemId: string) => void
   updateCartItemQuantity: (itemId: string, quantity: number) => void
   updateCartItemNotes: (itemId: string, notes: string) => void
+  markCartItemsSentForStation: (itemIds: string[], station: 'kitchen' | 'ben-marie', sentAt: string) => void
   clearCart: (options?: { keepTable?: boolean; keepCustomer?: boolean; keepCustomerCount?: boolean }) => void
   setSelectedTable: (table: Table | null) => void
   setCurrentCustomerCount: (count: number) => void
@@ -336,7 +342,7 @@ const response = await apiFetch('/api/auth/login', {
             return null
           }
 
-          set({ currentUser: data.user })
+          set({ currentUser: { ...data.user, role: normalizeRoleId(data.user.role) } })
           await get().loadFromDB()
           return data.user
         } catch (error) {
@@ -369,7 +375,7 @@ const response = await apiFetch('/api/auth/me', {
 
           const data = await response.json()
           const user = data?.user ?? null
-          set({ currentUser: user })
+          set({ currentUser: user ? { ...user, role: normalizeRoleId(user.role) } : null })
           return user
         } catch (error) {
           console.error('[refreshCurrentUser error]', error)
@@ -420,6 +426,7 @@ const response = await apiFetch('/api/auth/me', {
         set((state) => {
           const existingIndex = state.cart.findIndex(
             (i) =>
+              i.tableId === item.tableId &&
               i.menuItemId === item.menuItemId &&
               i.chairNumber === item.chairNumber &&
               JSON.stringify(i.modifiers) === JSON.stringify(item.modifiers)
@@ -427,9 +434,11 @@ const response = await apiFetch('/api/auth/me', {
           if (existingIndex >= 0) {
             const newCart = [...state.cart]
             newCart[existingIndex].quantity += item.quantity
+            newCart[existingIndex].kitchenSentAt = null
+            newCart[existingIndex].benMarieSentAt = null
             return { cart: newCart }
           }
-          return { cart: [...state.cart, item] }
+          return { cart: [...state.cart, { ...item, kitchenSentAt: null, benMarieSentAt: null }] }
         }),
       removeFromCart: (itemId) =>
         set((state) => ({
@@ -441,14 +450,24 @@ const response = await apiFetch('/api/auth/me', {
             quantity <= 0
               ? state.cart.filter((i) => i.id !== itemId)
               : state.cart.map((i) =>
-                  i.id === itemId ? { ...i, quantity } : i
+                  i.id === itemId ? { ...i, quantity, kitchenSentAt: null, benMarieSentAt: null } : i
                 ),
         })),
       updateCartItemNotes: (itemId, notes) =>
         set((state) => ({
           cart: state.cart.map((i) =>
-            i.id === itemId ? { ...i, notes } : i
+            i.id === itemId ? { ...i, notes, kitchenSentAt: null, benMarieSentAt: null } : i
           ),
+        })),
+      markCartItemsSentForStation: (itemIds, station, sentAt) =>
+        set((state) => ({
+          cart: state.cart.map((item) => {
+            if (!itemIds.includes(item.id)) return item
+            if (station === 'kitchen') {
+              return { ...item, kitchenSentAt: sentAt }
+            }
+            return { ...item, benMarieSentAt: sentAt }
+          }),
         })),
       clearCart: (options: { keepTable?: boolean; keepCustomer?: boolean; keepCustomerCount?: boolean } = {}) => set((state) => ({
         cart: [],
@@ -581,18 +600,27 @@ const response = await apiFetch('/api/auth/me', {
           }
         })
 
-        dbSync('POST', '/api/stock-adjustments', {
-          id: adjustment.id,
-          inventoryItemId: adjustment.inventoryItemId,
-          type: adjustment.type,
-          quantity: adjustment.quantity,
-          location: adjustment.location,
-          fromLocation: adjustment.fromLocation,
-          toLocation: adjustment.toLocation,
-          reason: adjustment.reason,
-          createdAt: adjustment.createdAt,
-          createdBy: adjustment.createdBy,
-        })
+        const updatedItem = get().inventory.find((entry) => entry.id === adjustment.inventoryItemId)
+        if (updatedItem) {
+          dbSync('PATCH', `/api/inventory/${adjustment.inventoryItemId}`, normalizeInventoryPatchForApi({
+            quantity: updatedItem.quantity,
+            storageQuantity: updatedItem.storageQuantity ?? 0,
+            lastRestocked: updatedItem.lastRestocked,
+          }))
+        }
+
+        // Keep DB sync compatible with current schema (daily inventory only)
+        if (adjustment.type !== 'transfer' && (adjustment.location ?? 'inventory') === 'inventory') {
+          dbSync('POST', '/api/stock-adjustments', {
+            id: adjustment.id,
+            inventoryItemId: adjustment.inventoryItemId,
+            type: adjustment.type,
+            quantity: adjustment.quantity,
+            reason: adjustment.reason,
+            createdAt: adjustment.createdAt,
+            createdBy: adjustment.createdBy,
+          })
+        }
       },
       addSupplier: (supplier) => {
         set((state) => ({ suppliers: [...state.suppliers, supplier] }))
@@ -746,7 +774,9 @@ const response = await apiFetch('/api/auth/me', {
             : null
 
           set({
-            users: Array.isArray(users) ? users : get().users,
+            users: Array.isArray(users)
+              ? users.map((user: User) => ({ ...user, role: normalizeRoleId(user.role) }))
+              : get().users,
             customers: incomingCustomers,
             selectedCustomer: syncedSelectedCustomer,
             categories: Array.isArray(categories) ? categories : get().categories,
@@ -855,8 +885,12 @@ const response = await apiFetch('/api/auth/me', {
       partialize: (state) => ({
         users: state.users,
         customers: state.customers,
+        selectedCustomer: state.selectedCustomer,
         categories: state.categories,
         menuItems: state.menuItems,
+        cart: state.cart,
+        selectedTable: state.selectedTable,
+        currentCustomerCount: state.currentCustomerCount,
         orders: state.orders,
         orderNumber: state.orderNumber,
         tables: state.tables,

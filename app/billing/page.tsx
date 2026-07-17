@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Header } from '@/components/shared/header'
 import { usePOSStore } from '@/lib/store'
-import { hasEffectiveRole } from '@/lib/roles'
+import { hasEffectiveRole, resolveEffectiveRole } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -18,7 +18,16 @@ import type { Order } from '@/lib/types'
 const WAITER_BILL_CONFIRMED = 'BILLER_CONFIRMED'
 const BILLING_READY_FOR_CASHIER = 'BILLING_READY_FOR_CASHIER'
 
-export default function BillingPage() {
+function normalizeQueueFlag(value?: string | null): string {
+  return (value ?? '').trim().toUpperCase()
+}
+
+function isBillerConfirmed(order: Order): boolean {
+  const normalized = normalizeQueueFlag(order.paymentCollectedBy)
+  return normalized === WAITER_BILL_CONFIRMED || normalized.startsWith('BILLER_CONFIRMED')
+}
+
+function BillingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const {
@@ -47,7 +56,7 @@ export default function BillingPage() {
   const currentBillerName = currentUser?.name?.trim() || 'Biller'
 
   const confirmedWaiterOrder = useMemo(
-    () => orders.find((order) => order.id === waiterOrderId && order.paymentStatus === 'pending' && order.paymentCollectedBy === WAITER_BILL_CONFIRMED) ?? null,
+    () => orders.find((order) => order.id === waiterOrderId && order.paymentStatus === 'pending' && isBillerConfirmed(order)) ?? null,
     [orders, waiterOrderId]
   )
 
@@ -93,8 +102,13 @@ export default function BillingPage() {
   }, [currentUser, mounted, router])
 
   useEffect(() => {
-    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'cashier'], settings)) {
-      router.push('/pay')
+    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'biller'], settings)) {
+      const effectiveRole = resolveEffectiveRole(currentUser.role, settings)
+      if (effectiveRole === 'cashier') {
+        router.push('/pay')
+        return
+      }
+      router.push('/pos')
     }
   }, [currentUser, mounted, router, settings])
 
@@ -107,7 +121,7 @@ export default function BillingPage() {
   useEffect(() => {
     if (!mounted || !waiterOrderId) return
     if (!confirmedWaiterOrder) {
-      router.push('/waiter-orders')
+      router.push('/biller-confirmation')
     }
   }, [confirmedWaiterOrder, mounted, router, waiterOrderId])
 
@@ -208,7 +222,7 @@ export default function BillingPage() {
     const bill = buildPendingBill()
     const runtimePrintSettings = getRuntimePrintSettings()
     printReceipt(bill, runtimePrintSettings)
-    toast.success(`Billing slip printed: ${generateBillCode(bill.orderNumber, bill.createdAt)}`)
+    toast.success(`${confirmedWaiterOrder ? 'Biller bill' : 'Billing slip'} printed: ${generateBillCode(bill.orderNumber, bill.createdAt)}`)
   }
 
   const handleSendToPayCounter = async () => {
@@ -254,14 +268,14 @@ export default function BillingPage() {
         clearCart()
       }
 
-      toast.success(`Bill ${billCode} sent to cashier queue • Total bill printed`)
+      toast.success(`${confirmedWaiterOrder ? 'Confirmed bill' : 'Bill'} ${billCode} sent to cashier queue • Printed for handoff`)
       router.push('/pos')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'cashier'], settings)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'biller'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -271,17 +285,19 @@ export default function BillingPage() {
 
   return (
     <div className="flex min-h-dvh flex-col overflow-x-hidden bg-gradient-to-b from-amber-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
-      <Header title="Billing Counter" />
+      <Header title="Biller Confirmation" />
 
       <div className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 xl:p-7">
         <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm dark:border-amber-900/40 dark:bg-card/80">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">Bill counter</p>
-              <h1 className="text-[clamp(1.125rem,2.5vw,2rem)] font-bold leading-tight text-foreground">Create, barcode, and hand over the bill</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300">Biller counter</p>
+              <h1 className="text-[clamp(1.125rem,2.5vw,2rem)] font-bold leading-tight text-foreground">Confirm the waiter bill, print it, and send it to cashier</h1>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/20">Billing</Badge>
+              <Badge variant="secondary" className="bg-amber-100 text-amber-900 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:hover:bg-amber-500/20">
+                {confirmedWaiterOrder ? 'Waiter bill' : 'Counter bill'}
+              </Badge>
               <Badge variant="outline">{currentCustomerCount} pax</Badge>
             </div>
           </div>
@@ -298,7 +314,7 @@ export default function BillingPage() {
             <CardContent className="space-y-4 p-6">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Order #{nextOrderNumber}</Badge>
-                  <Badge variant="outline">{confirmedWaiterOrder ? 'Waiter Confirmed' : 'Counter'}</Badge>
+                  <Badge variant="outline">{confirmedWaiterOrder ? 'Biller review' : 'Counter bill'}</Badge>
               </div>
 
               <div className="rounded-xl bg-amber-50 p-4 dark:bg-muted/30">
@@ -330,7 +346,7 @@ export default function BillingPage() {
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
                   <span>Collected by</span>
-                  <span className="text-right">Pending at cashier</span>
+                  <span className="text-right">Cashier queue</span>
                 </div>
                 <Separator className="my-3" />
                 <div className="flex items-end justify-between">
@@ -432,7 +448,7 @@ export default function BillingPage() {
               </div>
               <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
                 {isWaiterLiveOrder
-                  ? 'Waiter items are confirmed by biller here. Finalize the bill, then send it to cashier.'
+                  ? 'Waiter items are confirmed here by the biller. Print the bill, then send it to cashier.'
                   : 'Cashier can search or scan this bill code at the cashier counter.'}
               </p>
             </CardContent>
@@ -440,18 +456,32 @@ export default function BillingPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <Button variant="outline" size="lg" className="w-full xl:w-auto" onClick={() => router.push('/pos')}>Back to Biller</Button>
+          <Button variant="outline" size="lg" className="w-full xl:w-auto" onClick={() => router.push('/biller-confirmation')}>Back to Biller Queue</Button>
           <div className="flex flex-col gap-3 lg:flex-row xl:justify-end">
             <Button variant="secondary" size="lg" className="w-full gap-2 lg:w-auto" onClick={handlePrintBillingSlip} disabled={billingItems.length === 0 || isSubmitting}>
               <Printer className="h-4 w-4" />
-              Print Billing Slip
+              {confirmedWaiterOrder ? 'Print Bill for Cashier' : 'Print Billing Slip'}
             </Button>
             <Button size="lg" className="w-full lg:min-w-64 xl:min-w-72" onClick={handleSendToPayCounter} disabled={isSubmitting || billingItems.length === 0}>
-              {isSubmitting ? 'Sending...' : 'Send Bill to Cashier'}
+              {isSubmitting ? 'Sending...' : confirmedWaiterOrder ? 'Confirm & Send to Cashier' : 'Send Bill to Cashier'}
             </Button>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <BillingPageContent />
+    </Suspense>
   )
 }

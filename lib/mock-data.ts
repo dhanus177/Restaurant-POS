@@ -2,10 +2,10 @@ import type { User, Category, MenuItem, Table, InventoryItem, Order, Settings, S
 
 export const mockUsers: User[] = [
   { id: '1', name: 'Owner', pin: '2111', role: 'super-admin' },
-  { id: '2', name: 'Sarah (Cashier)', pin: '2222', role: 'cashier' },
+  { id: '2', name: 'Sarah (Biller)', pin: '8888', role: 'biller' },
   { id: '3', name: 'Mike (Kitchen)', pin: '3333', role: 'kitchen' },
   { id: '4', name: 'Emma (Cashier)', pin: '4444', role: 'cashier' },
-  { id: '5', name: 'Noah (Pay Counter)', pin: '5555', role: 'pay-counter' },
+  { id: '5', name: 'Noah (Cashier)', pin: '5555', role: 'cashier' },
   { id: '6', name: 'Liam (Takeaway)', pin: '6666', role: 'takeaway' },
   { id: '7', name: 'Wendy (Waiter)', pin: '7777', role: 'waiter' },
 ]

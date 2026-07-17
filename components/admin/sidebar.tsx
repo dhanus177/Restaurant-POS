@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   ReceiptText,
   ShieldCheck,
+  ClipboardList,
 } from 'lucide-react'
 import { usePOSStore } from '@/lib/store'
 
@@ -43,7 +44,8 @@ const navItems = [
 
 const quickLinks = [
   { href: '/pos', label: 'POS Terminal', icon: Store },
-  { href: '/pay', label: 'Pay Counter', icon: WalletCards },
+  { href: '/pay', label: 'Cashier', icon: WalletCards },
+  { href: '/biller-confirmation', label: 'Biller Queue', icon: ClipboardList },
   { href: '/takeaway', label: 'Takeaway Counter', icon: ShoppingBag },
   { href: '/kitchen', label: 'Kitchen Display', icon: ChefHat },
   { href: '/inventory', label: 'Inventory', icon: Package },

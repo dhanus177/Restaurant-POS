@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { normalizeRoleId } from '@/lib/roles'
 
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'restaurant_pos_session'
 const SESSION_MAX_AGE = Number(process.env.SESSION_MAX_AGE ?? 60 * 60 * 24 * 7) // 7 days
@@ -41,7 +42,13 @@ export async function getSessionFromRequest(req: Request) {
     return null
   }
 
-  return session
+  return {
+    ...session,
+    user: {
+      ...session.user,
+      role: normalizeRoleId(session.user.role),
+    },
+  }
 }
 
 export function attachSessionCookie(res: NextResponse, token: string) {

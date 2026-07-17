@@ -125,11 +125,11 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
   }
 
   return (
-    <div className={cn('flex h-full flex-col bg-card border-l border-border', className)}>
+    <div className={cn('flex h-full min-h-0 flex-col bg-card', className)}>
       {/* Header */}
-      <div className="border-b border-border p-4">
+      <div className="border-b border-border p-3 sm:p-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Current Order</h2>
+          <h2 className="text-base font-semibold text-foreground sm:text-lg">Current Order</h2>
           {cart.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearCart} className="text-destructive hover:text-destructive">
               <Trash2 className="h-4 w-4 mr-1" />
@@ -137,7 +137,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
             </Button>
           )}
         </div>
-        <div className="mt-2 space-y-1 rounded-md border p-2">
+        <div className="mt-2 space-y-1.5 rounded-md border p-2.5">
           <p className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
             {settings.requireCustomerBeforeOrder === true ? 'Step 1 — Customer details' : 'Customer details (optional)'}
           </p>
@@ -208,7 +208,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
             placeholder="Search customers by name/phone"
-            className="h-8"
+            className="h-9 text-sm"
           />
           <Select
             value={selectedCustomer?.id ?? 'walk-in'}
@@ -222,7 +222,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
               setSelectedCustomer(customer)
             }}
           >
-            <SelectTrigger className="h-9">
+            <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder="Walk-in customer" />
             </SelectTrigger>
             <SelectContent>
@@ -239,12 +239,12 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
           )}
         </div>
 
-        <div className="mt-2 rounded-md border p-2">
+        <div className="mt-2 rounded-md border p-2.5">
           <p className="mb-2 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Step 2 — Table selection</p>
           <Button
             variant={selectedTable ? 'secondary' : 'outline'}
             size="sm"
-            className="w-full justify-start"
+            className="h-9 w-full justify-start text-sm"
             onClick={onSelectTable}
           >
             {selectedTable ? `Table: ${selectedTable.name}` : orderMode === 'takeaway' ? 'Takeaway' : 'Select Table'}
@@ -253,7 +253,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
       </div>
 
       {/* Cart Items */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
             <p>No items in cart</p>
@@ -345,7 +345,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
       </ScrollArea>
 
       {/* Totals & Checkout */}
-      <div className="border-t border-border p-4 space-y-3">
+      <div className="space-y-3 border-t border-border p-3 sm:p-4">
         <div className="space-y-2 text-sm">
           <div className="flex justify-between text-muted-foreground">
             <span>Subtotal</span>
@@ -372,7 +372,7 @@ export function Cart({ onCreateBill, onSelectTable, orderMode = 'dine-in', class
         </div>
         <Button
           size="lg"
-          className="w-full h-14 text-lg font-semibold"
+          className="h-13 w-full text-base font-semibold sm:h-14 sm:text-lg"
           disabled={cart.length === 0}
           onClick={handleCreateBillClick}
         >

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PaymentModal } from '@/components/pos/payment-modal'
-import { generateBillCode } from '@/lib/print'
+import { generateBillCode, matchesBillScanInput } from '@/lib/print'
 import type { Order, Shift } from '@/lib/types'
 import { ScanBarcode, Search, CreditCard, ReceiptText, ShoppingBag, Check, DollarSign, Wallet, HandCoins, BadgeDollarSign } from 'lucide-react'
 import { toast } from 'sonner'
@@ -33,6 +33,7 @@ function groupChairSummary(order: Order) {
 }
 
 const LKR_DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10, 5, 2, 1] as const
+const BILLING_READY_FOR_CASHIER = 'BILLING_READY_FOR_CASHIER'
 
 const initialDenominationState = LKR_DENOMINATIONS.reduce<Record<string, string>>((acc, value) => {
   acc[String(value)] = ''
@@ -76,8 +77,8 @@ export default function PayPage() {
   const [isSavingCashOut, setIsSavingCashOut] = useState(false)
   const [isClosingDrawer, setIsClosingDrawer] = useState(false)
   const canReverseBills = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin'], settings)
-  const canManageDrawer = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings)
-  const canRecordCashOut = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings)
+  const canManageDrawer = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'cashier'], settings)
+  const canRecordCashOut = hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'cashier'], settings)
 
   useEffect(() => {
     setMounted(true)
@@ -99,13 +100,16 @@ export default function PayPage() {
       return
     }
 
-    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'pay-counter'], settings)) {
+    if (mounted && currentUser && !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'cashier'], settings)) {
       router.push('/pos')
     }
   }, [currentUser, mounted, router, settings])
 
   const unpaidOrders = useMemo(
-    () => orders.filter((o) => o.paymentStatus === 'pending').sort((a, b) => b.orderNumber - a.orderNumber),
+    () =>
+      orders
+        .filter((o) => o.paymentStatus === 'pending' && o.paymentCollectedBy === BILLING_READY_FOR_CASHIER)
+        .sort((a, b) => b.orderNumber - a.orderNumber),
     [orders]
   )
 
@@ -175,7 +179,7 @@ export default function PayPage() {
 
   const handleSaveCashDrawer = async () => {
     if (!canManageDrawer) {
-      toast.error('Only admin, super-admin, and pay-counter can change cash drawer balance')
+      toast.error('Only admin, super-admin, and cashier can change cash drawer balance')
       return
     }
 
@@ -265,7 +269,7 @@ export default function PayPage() {
 
   const handleCloseCashDrawer = async () => {
     if (!canManageDrawer) {
-      toast.error('Only admin, super-admin, and pay-counter can close the cash drawer')
+      toast.error('Only admin, super-admin, and cashier can close the cash drawer')
       return
     }
 
@@ -327,7 +331,7 @@ export default function PayPage() {
   const handleScanLookup = (value: string) => {
     const normalized = value.trim()
     setScanCode(normalized)
-    const match = unpaidOrders.find((o) => generateBillCode(o.orderNumber, o.createdAt).toLowerCase() === normalized.toLowerCase())
+    const match = unpaidOrders.find((o) => matchesBillScanInput(o.orderNumber, o.createdAt, normalized))
     if (match) {
       setSelectedOrder(match)
     }
@@ -352,7 +356,7 @@ export default function PayPage() {
 
   const closeoutVariance = Number(countedCashInput || 0) - drawerBalance.currentBalance
 
-  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'pay-counter'], settings)) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'cashier'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -368,29 +372,52 @@ export default function PayPage() {
         <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm dark:border-emerald-900/40 dark:bg-card/80">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Pay counter</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Cashier</p>
               <h1 className="text-xl font-bold text-foreground sm:text-2xl">Search a bill and collect payment</h1>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/20">Pay</Badge>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200 dark:hover:bg-emerald-500/20">Cashier</Badge>
               <Badge variant="outline">{filtered.length} pending</Badge>
             </div>
           </div>
         </div>
 
+        <Card className="mb-4 border-emerald-200 shadow-sm dark:border-emerald-900/40">
+          <CardHeader className="bg-emerald-50/70 dark:bg-card/70">
+            <CardTitle className="flex items-center gap-2">
+              <ScanBarcode className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
+              Scan or search bill
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 p-5">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+              <Input
+                placeholder="Scan barcode / type BILL-YYMMDD-0000"
+                value={scanCode}
+                onChange={(e) => handleScanLookup(e.target.value)}
+                className="h-12 font-mono"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+              />
+              <Button variant="secondary" size="lg" onClick={() => handleScanLookup(scanCode)} className="gap-2">
+                <Search className="h-4 w-4" />
+                Lookup
+              </Button>
+            </div>
+            <Input
+              placeholder="Search by order #, table name, or bill code"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-12"
+            />
+          </CardContent>
+        </Card>
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold">Pending Bills</h2>
             <p className="text-sm text-muted-foreground">Collect payment by bill number, table, or bill code.</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => router.push('/takeaway')} className="w-full gap-2 sm:w-auto">
-              <ShoppingBag className="h-4 w-4" />
-              Takeaway Counter
-            </Button>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => router.push('/billing')}>
-              Go to Billing
-            </Button>
           </div>
         </div>
 
@@ -456,44 +483,13 @@ export default function PayPage() {
           </div>
         )}
 
-        <div className="mb-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <Card className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
-            <CardHeader className="bg-emerald-50/70 dark:bg-card/70">
-              <CardTitle className="flex items-center gap-2">
-                <ScanBarcode className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
-                Scan or search bill
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-5">
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <Input
-                  placeholder="Scan barcode / type BILL-YYMMDD-0000"
-                  value={scanCode}
-                  onChange={(e) => handleScanLookup(e.target.value)}
-                  className="h-12 font-mono"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                <Button variant="secondary" size="lg" onClick={() => handleScanLookup(scanCode)} className="gap-2">
-                  <Search className="h-4 w-4" />
-                  Lookup
-                </Button>
-              </div>
-              <Input
-                placeholder="Search by order #, table name, or bill code"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="h-12"
-              />
-            </CardContent>
-          </Card>
+        <div className="mb-4 grid gap-4 lg:grid-cols-2">
 
           <Card className="border-emerald-200 shadow-sm dark:border-emerald-900/40">
             <CardHeader className="bg-emerald-50/70 dark:bg-card/70">
-              <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
-                Pay counter status
+                Cashier status
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 p-5">
@@ -545,7 +541,7 @@ export default function PayPage() {
                 </div>
               ) : (
                 <p className="rounded-lg bg-background p-3 text-sm text-muted-foreground border">
-                  Current drawer balance is visible to pay counter staff. Only admin and super-admin can reset the opening balance.
+                  Current drawer balance is visible to cashier staff. Only admin and super-admin can reset the opening balance.
                 </p>
               )}
 

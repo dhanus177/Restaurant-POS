@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User, WalletCards, ShoppingBag } from 'lucide-react'
+import { UtensilsCrossed, ChefHat, Package, Settings, LogOut, User, WalletCards, ShoppingBag, ClipboardList } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
@@ -48,12 +48,12 @@ export function Header({ title }: HeaderProps) {
         return 'bg-violet-600'
       case 'admin':
         return 'bg-primary'
+      case 'biller':
+        return 'bg-indigo-600'
       case 'cashier':
-        return 'bg-chart-2'
+        return 'bg-emerald-600'
       case 'kitchen':
         return 'bg-warning'
-      case 'pay-counter':
-        return 'bg-emerald-600'
       case 'takeaway':
         return 'bg-orange-600'
       case 'waiter':
@@ -107,7 +107,13 @@ export function Header({ title }: HeaderProps) {
             <Button variant="ghost" size="sm" asChild>
               <Link href="/pay" className="gap-2">
                 <WalletCards className="h-4 w-4" />
-                Pay Counter
+                Cashier
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/biller-confirmation" className="gap-2">
+                <ClipboardList className="h-4 w-4" />
+                Biller Queue
               </Link>
             </Button>
             {canAccessTakeaway && (
@@ -172,7 +178,7 @@ export function Header({ title }: HeaderProps) {
                 <DropdownMenuItem asChild>
                   <Link href="/waiter" className="gap-2">
                     <User className="h-4 w-4" />
-                    Waiter POS
+                    Waiter
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -184,15 +190,23 @@ export function Header({ title }: HeaderProps) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter'], settings) && (
+              {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'cashier'], settings) && (
                 <DropdownMenuItem asChild>
                   <Link href="/pay" className="gap-2">
                     <WalletCards className="h-4 w-4" />
-                    Pay Counter
+                    Cashier
                   </Link>
                 </DropdownMenuItem>
               )}
-              {canAccessTakeaway && hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'pay-counter', 'cashier', 'takeaway'], settings) && (
+              {hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'cashier', 'biller'], settings) && (
+                <DropdownMenuItem asChild>
+                  <Link href="/biller-confirmation" className="gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Biller Queue
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {canAccessTakeaway && hasEffectiveRole(currentUser?.role ?? '', ['admin', 'super-admin', 'cashier', 'takeaway'], settings) && (
                 <DropdownMenuItem asChild>
                   <Link href="/takeaway" className="gap-2">
                     <ShoppingBag className="h-4 w-4" />

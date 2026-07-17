@@ -60,9 +60,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!checkingSetup && setupStatus?.setupComplete && currentUser) {
-      if (isMobile && !hasEffectiveRole(currentUser.role, ['super-admin', 'cashier'], settings)) {
+      if (isMobile && !hasEffectiveRole(currentUser.role, ['super-admin', 'waiter'], settings)) {
         void logout()
-        setError('Mobile login is allowed only for Super Admin and Cashier roles')
+        setError('Mobile login is allowed only for Super Admin and Waiter roles')
         setPin('')
         return
       }
@@ -75,7 +75,7 @@ export default function LoginPage() {
       case 'super-admin':
         router.push('/admin')
         break
-      case 'cashier':
+      case 'biller':
         router.push('/pos')
         break
       case 'kitchen':
@@ -84,7 +84,7 @@ export default function LoginPage() {
       case 'admin':
         router.push('/admin')
         break
-      case 'pay-counter':
+      case 'cashier':
         router.push('/pay')
         break
       case 'takeaway':
@@ -108,9 +108,9 @@ export default function LoginPage() {
       if (newPin.length === 4) {
         const user = await loginWithPin(newPin)
         if (user) {
-          if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'cashier'], settings)) {
+          if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'waiter'], settings)) {
             await logout()
-            setError('Mobile login is allowed only for Super Admin and Cashier roles')
+            setError('Mobile login is allowed only for Super Admin and Waiter roles')
             setTimeout(() => setPin(''), 300)
             return
           }
@@ -133,26 +133,26 @@ export default function LoginPage() {
     setError('')
   }
 
-  const handleQuickLogin = async (role: 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'pay-counter' | 'takeaway' | 'waiter') => {
-    if (isMobile && !['cashier', 'super-admin'].includes(role)) {
-      setError('Mobile login is allowed only for Super Admin and Cashier roles')
+  const handleQuickLogin = async (role: 'biller' | 'cashier' | 'kitchen' | 'admin' | 'super-admin' | 'takeaway' | 'waiter') => {
+    if (isMobile && !['super-admin', 'waiter'].includes(role)) {
+      setError('Mobile login is allowed only for Super Admin and Waiter roles')
       return
     }
 
     const pins: Record<string, string> = {
+      biller: '8888',
       cashier: '2222',
       kitchen: '3333',
       admin: '1234',
       'super-admin': '2111',
-      'pay-counter': '5555',
       takeaway: '6666',
       waiter: '7777',
     }
     const user = await loginWithPin(pins[role])
     if (user) {
-      if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'cashier'], settings)) {
+      if (isMobile && !hasEffectiveRole(user.role, ['super-admin', 'waiter'], settings)) {
         await logout()
-        setError('Mobile login is allowed only for Super Admin and Cashier roles')
+        setError('Mobile login is allowed only for Super Admin and Waiter roles')
         setPin('')
         return
       }
@@ -289,7 +289,18 @@ export default function LoginPage() {
               variant="outline"
               size="lg"
               className="gap-2"
+              onClick={() => handleQuickLogin('biller')}
+              disabled={isMobile}
+            >
+              <UtensilsCrossed className="h-5 w-5" />
+              Biller
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
               onClick={() => handleQuickLogin('cashier')}
+              disabled={isMobile}
             >
               <UtensilsCrossed className="h-5 w-5" />
               Cashier
@@ -317,11 +328,11 @@ export default function LoginPage() {
               variant="outline"
               size="lg"
               className="gap-2"
-              onClick={() => handleQuickLogin('pay-counter')}
+              onClick={() => handleQuickLogin('cashier')}
               disabled={isMobile}
             >
               <WalletCards className="h-5 w-5" />
-              Pay Counter
+              Cashier
             </Button>
             <Button
               variant="outline"
@@ -338,7 +349,6 @@ export default function LoginPage() {
               size="lg"
               className="gap-2"
               onClick={() => handleQuickLogin('waiter')}
-              disabled={isMobile}
             >
               <User className="h-5 w-5" />
               Waiter

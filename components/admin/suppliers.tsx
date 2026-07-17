@@ -1286,9 +1286,43 @@ export function SuppliersManager() {
                               </div>
                             </TableCell>
                             <TableCell className="max-w-[260px] text-xs text-muted-foreground">
-                              {entry.billItems && entry.billItems.length > 0
-                                ? entry.billItems.map((item) => `${item.quantity}x ${item.name}`).join(', ')
-                                : '—'}
+                              {entry.billItems && entry.billItems.length > 0 ? (
+                                <div className="space-y-1">
+                                  {entry.billItems.map((item) => (
+                                    <div key={item.id} className="rounded border bg-background/60 px-2 py-1">
+                                      <div className="font-medium text-foreground">
+                                        {item.quantity}x {item.linkedInventoryItem?.name || item.name}
+                                      </div>
+                                      <div className="flex flex-wrap gap-1 pt-1">
+                                        {item.linkedInventoryItem ? (
+                                          <Badge variant="outline" className="h-5 rounded px-1.5 text-[10px]">
+                                            Linked: {item.linkedInventoryItem.sku}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="secondary" className="h-5 rounded px-1.5 text-[10px]">
+                                            New item
+                                          </Badge>
+                                        )}
+                                        <Badge variant="outline" className="h-5 rounded px-1.5 text-[10px]">
+                                          Unit: {item.linkedInventoryItem?.unit || item.unit || '—'}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : entry.inventoryItem ? (
+                                <div className="space-y-1">
+                                  <div className="font-medium text-foreground">{entry.inventoryItem.name}</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    <Badge variant="outline" className="h-5 rounded px-1.5 text-[10px]">
+                                      Linked: {entry.inventoryItem.sku}
+                                    </Badge>
+                                    <Badge variant="outline" className="h-5 rounded px-1.5 text-[10px]">
+                                      Unit: {entry.inventoryItem.unit}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ) : '—'}
                             </TableCell>
                             <TableCell>{entry.quantity ?? '—'}</TableCell>
                             <TableCell>{entry.amount.toFixed(2)}</TableCell>

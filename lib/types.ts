@@ -1,5 +1,5 @@
 // User & Roles
-export type BuiltInRole = 'super-admin' | 'admin' | 'cashier' | 'kitchen' | 'pay-counter' | 'takeaway' | 'waiter'
+export type BuiltInRole = 'super-admin' | 'admin' | 'biller' | 'cashier' | 'kitchen' | 'takeaway' | 'waiter'
 export type Role = string
 
 export interface RoleDefinition {
@@ -91,6 +91,7 @@ export interface OrderItem {
   quantity: number
   price: number
   modifiers: SelectedModifier[]
+  prepStation?: 'kitchen' | 'ben-marie'
   notes?: string
   serviceChargeApplicable?: boolean
   chairNumber?: number
@@ -154,6 +155,12 @@ export type SupplierPaymentMethod = 'cash' | 'cheque' | 'bank-transfer'
 export interface SupplierBillItem {
   id: string
   inventoryItemId?: string | null
+  linkedInventoryItem?: {
+    id: string
+    name: string
+    sku: string
+    unit: string
+  } | null
   unit?: string | null
   name: string
   quantity: number
@@ -167,6 +174,12 @@ export interface SupplierLedgerEntry {
   type: SupplierLedgerEntryType
   reference?: string | null
   inventoryItemId?: string | null
+  inventoryItem?: {
+    id: string
+    name: string
+    sku: string
+    unit: string
+  } | null
   quantity?: number | null
   amount: number
   paymentMethod?: SupplierPaymentMethod | null

@@ -117,6 +117,12 @@ export function OrderCard({ order, onUpdateStatus }: OrderCardProps) {
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold text-foreground">{item.quantity}x</span>
                 <span className="font-medium text-foreground">{item.name}</span>
+                <Badge
+                  variant="outline"
+                  className="ml-1 h-5 rounded px-1.5 text-[10px] font-semibold uppercase tracking-wide"
+                >
+                  {(item.prepStation ?? 'kitchen').replace('-', ' ')}
+                </Badge>
               </div>
               {item.modifiers.length > 0 && (
                 <p className="text-sm text-muted-foreground mt-0.5">

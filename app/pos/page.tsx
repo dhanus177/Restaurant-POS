@@ -2,22 +2,25 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { hasEffectiveRole, resolveEffectiveRole } from '@/lib/roles'
 import { usePOSStore } from '@/lib/store'
 import { Header } from '@/components/shared/header'
 import { MenuGrid } from '@/components/pos/menu-grid'
 import { Cart } from '@/components/pos/cart'
 import { OrderModifiers } from '@/components/pos/order-modifiers'
-import { ExtraItemsDialog } from '@/components/pos/extra-items-dialog'
 import { TableSelector } from '@/components/pos/table-selector'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, Users } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ClipboardList, ShoppingCart, Users } from 'lucide-react'
 import type { MenuItem, SelectedModifier } from '@/lib/types'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 function normalizePhoneNumber(value: string) {
   return value.replace(/\D/g, '')
@@ -36,7 +39,7 @@ export default function POSPage() {
     createCustomer,
     addToCart,
     cart,
-    menuItems,
+    clearCart,
     selectedTable,
     settings,
     getCartTotal,
@@ -44,8 +47,6 @@ export default function POSPage() {
   const [mounted, setMounted] = useState(false)
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null)
   const [showModifiers, setShowModifiers] = useState(false)
-  const [showExtraItems, setShowExtraItems] = useState(false)
-  const [extraItemsSource, setExtraItemsSource] = useState<MenuItem | null>(null)
   const [showTableSelector, setShowTableSelector] = useState(false)
   const [showMobileCart, setShowMobileCart] = useState(false)
   const [orderMode, setOrderMode] = useState<'dine-in' | 'takeaway'>('dine-in')
@@ -78,6 +79,30 @@ export default function POSPage() {
       router.push('/')
     }
   }, [currentUser, mounted, router])
+
+  useEffect(() => {
+    if (!mounted || !currentUser) return
+
+    if (!hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'waiter', 'biller'], settings)) {
+      const effectiveRole = resolveEffectiveRole(currentUser.role, settings)
+      if (effectiveRole === 'cashier') {
+        router.push('/pay')
+        return
+      }
+      router.push('/')
+    }
+  }, [currentUser, mounted, router, settings])
+
+  useEffect(() => {
+    if (!mounted || !currentUser) return
+    if (!hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'biller'], settings)) return
+
+    const hasWaiterDraftItems = cart.some((item) => typeof item.chairNumber === 'number' && item.chairNumber > 0)
+    if (!hasWaiterDraftItems) return
+
+    clearCart()
+    toast.info('Waiter order drafts are available in Biller Queue only. POS cart was reset.')
+  }, [cart, clearCart, currentUser, mounted, settings])
 
   useEffect(() => {
     if (selectedTable) {
@@ -137,25 +162,9 @@ export default function POSPage() {
       quantity,
       price: item.price,
       modifiers,
+      prepStation: item.prepStation ?? 'kitchen',
       serviceChargeApplicable: item.applyServiceCharge,
     })
-  }
-
-  const openExtraItemsPrompt = (sourceItem: MenuItem) => {
-    const hasOtherItems = menuItems.some((item) => item.isAvailable && item.id !== sourceItem.id)
-    if (!hasOtherItems) {
-      setExtraItemsSource(null)
-      setShowExtraItems(false)
-      return
-    }
-
-    setExtraItemsSource(sourceItem)
-    setShowExtraItems(true)
-  }
-
-  const closeExtraItemsPrompt = () => {
-    setShowExtraItems(false)
-    setExtraItemsSource(null)
   }
 
   const handleSelectItem = (item: MenuItem) => {
@@ -163,12 +172,10 @@ export default function POSPage() {
     if (!ensureOrderModeReady()) return
 
     if (item.modifierGroups && item.modifierGroups.length > 0) {
-      setExtraItemsSource(item)
       setSelectedItem(item)
       setShowModifiers(true)
     } else {
       addMenuItemToCart(item)
-      openExtraItemsPrompt(item)
     }
   }
 
@@ -179,22 +186,6 @@ export default function POSPage() {
     addMenuItemToCart(item, modifiers, quantity)
     setShowModifiers(false)
     setSelectedItem(null)
-
-    if (extraItemsSource) {
-      setShowExtraItems(true)
-    }
-  }
-
-  const handleSelectExtraItem = (item: MenuItem) => {
-    if (item.modifierGroups && item.modifierGroups.length > 0) {
-      setShowExtraItems(false)
-      setSelectedItem(item)
-      setShowModifiers(true)
-      return
-    }
-
-    addMenuItemToCart(item)
-    toast.success(`${item.name} added as an extra item`)
   }
 
   const setLookupPhone = (value: string) => {
@@ -312,7 +303,7 @@ export default function POSPage() {
     setShowMobileCart(open)
   }
 
-  if (!mounted || !currentUser) {
+  if (!mounted || !currentUser || !hasEffectiveRole(currentUser.role, ['admin', 'super-admin', 'biller'], settings)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-muted-foreground">Loading...</div>
@@ -321,25 +312,57 @@ export default function POSPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-gradient-to-b from-sky-50 via-background to-background dark:from-slate-950 dark:via-background dark:to-background">
       <Header title="POS Terminal" />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Menu Section */}
-        <div className={`min-w-0 flex-1 overflow-hidden ${isMobile ? 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]' : ''}`}>
-          <MenuGrid onSelectItem={handleSelectItem} />
+      <div className="mx-auto flex w-full max-w-[1500px] flex-1 flex-col gap-4 overflow-hidden p-3 sm:p-4 lg:p-6">
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-4 shadow-sm sm:p-5 dark:border-sky-900/40 dark:bg-card/80">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">POS service</p>
+              <h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">Take orders, review cart, and send to billing</h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="bg-sky-100 text-sky-900 hover:bg-sky-100 dark:bg-sky-500/15 dark:text-sky-200">
+                {currentUser.role}
+              </Badge>
+              <Badge variant="outline">{cartCount} items</Badge>
+              <Badge variant="outline">
+                {selectedTable ? selectedTable.name : orderMode === 'takeaway' ? 'Takeaway' : 'No table'}
+              </Badge>
+              <Button variant="outline" className="gap-2" onClick={() => router.push('/biller-confirmation')}>
+                <ClipboardList className="h-4 w-4" />
+                Waiter Bill Confirmation
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Desktop Cart Section */}
-        {!isMobile && (
-          <div className="w-full max-w-sm">
-            <Cart
-              orderMode={orderMode}
-              onCreateBill={() => router.push('/billing')}
-              onSelectTable={() => setShowTableSelector(true)}
-            />
-          </div>
-        )}
+        <div className={cn('grid min-h-0 flex-1 items-start gap-4 lg:h-[calc(100dvh-14.75rem)] lg:grid-cols-[minmax(0,1.5fr)_380px]', isMobile && 'pb-[calc(5.5rem+env(safe-area-inset-bottom))]')}>
+          <Card className="h-full min-h-0 overflow-hidden border-sky-200 shadow-sm dark:border-sky-900/40">
+            <CardHeader className="bg-sky-50/70 dark:bg-card/70">
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-sky-700 dark:text-sky-300" />
+                Menu
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-full min-h-0 p-0">
+              <MenuGrid onSelectItem={handleSelectItem} />
+            </CardContent>
+          </Card>
+
+          {/* Desktop Cart Section */}
+          {!isMobile && (
+            <div className="h-full min-h-0 overflow-hidden rounded-2xl border border-sky-200 bg-background/90 dark:border-sky-900/40 dark:bg-card/60">
+              <Cart
+                className="h-full"
+                orderMode={orderMode}
+                onCreateBill={() => router.push('/billing')}
+                onSelectTable={() => setShowTableSelector(true)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Mobile Waiter Action Bar */}
@@ -402,15 +425,6 @@ export default function POSPage() {
           setSelectedItem(null)
         }}
         onConfirm={handleConfirmModifiers}
-      />
-
-      <ExtraItemsDialog
-        open={showExtraItems}
-        sourceItem={extraItemsSource}
-        items={menuItems}
-        currencySymbol={settings.currencySymbol}
-        onSelectItem={handleSelectExtraItem}
-        onClose={closeExtraItemsPrompt}
       />
 
       <TableSelector

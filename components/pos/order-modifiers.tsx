@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -91,6 +91,9 @@ export function OrderModifiers({ item, open, onClose, onConfirm }: OrderModifier
             <span>{item.name}</span>
             <span className="text-primary">{settings.currencySymbol}{item.price.toFixed(2)}</span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Select quantity and modifiers, then add the configured menu item to the order.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4 space-y-6">

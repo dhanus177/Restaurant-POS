@@ -1,6 +1,6 @@
 'use client'
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { usePOSStore } from '@/lib/store'
@@ -52,6 +52,9 @@ export function TableSelector({ open, onClose, onOrderModeChange }: TableSelecto
       <DialogContent className="max-w-[95vw] md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Select Table</DialogTitle>
+          <DialogDescription className="sr-only">
+            Choose takeaway or an available table based on customer count.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="py-4">

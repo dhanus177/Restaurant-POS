@@ -6,6 +6,7 @@ export async function GET() {
   return NextResponse.json(
     items.map((i) => ({
       ...i,
+      storageQuantity: Number(i.storageQuantity ?? 0),
       lastRestocked: i.lastRestocked?.toISOString() ?? undefined,
     }))
   )
@@ -15,10 +16,14 @@ export async function POST(req: Request) {
   const body = await req.json()
   const { lastRestocked, ...rest } = body
   const item = await prisma.inventoryItem.create({
-    data: { ...rest, lastRestocked: lastRestocked ? new Date(lastRestocked) : null },
+    data: {
+      ...rest,
+      storageQuantity: Number(rest?.storageQuantity ?? 0),
+      lastRestocked: lastRestocked ? new Date(lastRestocked) : null,
+    },
   })
   return NextResponse.json(
-    { ...item, lastRestocked: item.lastRestocked?.toISOString() ?? undefined },
+    { ...item, storageQuantity: Number(item.storageQuantity ?? 0), lastRestocked: item.lastRestocked?.toISOString() ?? undefined },
     { status: 201 }
   )
 }

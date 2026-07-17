@@ -12,12 +12,20 @@ type ParsedBillItem = {
   total: number
 }
 
+type InventorySnapshot = {
+  id: string
+  name: string
+  sku: string
+  unit: string
+}
+
 function toAppLedgerEntry(entry: {
   id: string
   supplierId: string
   type: string
   reference: string | null
   inventoryItemId: string | null
+  inventoryItem?: InventorySnapshot | null
   quantity: number | null
   amount: number
   paymentMethod: string | null
@@ -25,21 +33,56 @@ function toAppLedgerEntry(entry: {
   billItems: unknown
   notes: string | null
   createdAt: Date
-}) {
+}, inventoryById: Map<string, InventorySnapshot> = new Map()) {
+  const normalizedBillItems = Array.isArray(entry.billItems)
+    ? entry.billItems.map((item: any) => {
+        const linkedInventoryItem =
+          typeof item?.inventoryItemId === 'string' && item.inventoryItemId.trim()
+            ? inventoryById.get(item.inventoryItemId.trim()) ?? null
+            : null
+
+        return {
+          ...item,
+          inventoryItemId: typeof item?.inventoryItemId === 'string' ? item.inventoryItemId : null,
+          name: typeof item?.name === 'string' && item.name.trim() ? item.name : linkedInventoryItem?.name ?? '',
+          unit: typeof item?.unit === 'string' && item.unit.trim() ? item.unit : linkedInventoryItem?.unit ?? null,
+          linkedInventoryItem,
+        }
+      })
+    : null
+
   return {
     ...entry,
     createdAt: entry.createdAt.toISOString(),
+    inventoryItem: entry.inventoryItem ?? (entry.inventoryItemId ? inventoryById.get(entry.inventoryItemId) ?? null : null),
+    billItems: normalizedBillItems,
   }
+}
+
+async function buildInventoryMapForLedger(supplierId: string) {
+  const inventoryItems = await prisma.inventoryItem.findMany({
+    where: { supplierId },
+    select: { id: true, name: true, sku: true, unit: true },
+  })
+
+  return new Map(inventoryItems.map((item) => [item.id, item]))
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const entries = await prisma.supplierLedgerEntry.findMany({
     where: { supplierId: id },
+    include: {
+      inventoryItem: {
+        select: { id: true, name: true, sku: true, unit: true },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   })
 
-  return NextResponse.json(entries.map(toAppLedgerEntry))
+  const inventoryById = await buildInventoryMapForLedger(id)
+
+  return NextResponse.json(entries.map((entry) => toAppLedgerEntry(entry, inventoryById)))
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -191,7 +234,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       billItems: billItems as Prisma.InputJsonValue,
       notes: typeof body?.notes === 'string' && body.notes.trim() ? body.notes.trim() : null,
     },
+    include: {
+      inventoryItem: {
+        select: { id: true, name: true, sku: true, unit: true },
+      },
+    },
   })
 
-  return NextResponse.json(toAppLedgerEntry(entry), { status: 201 })
+  const inventoryById = await buildInventoryMapForLedger(id)
+
+  return NextResponse.json(toAppLedgerEntry(entry, inventoryById), { status: 201 })
 }

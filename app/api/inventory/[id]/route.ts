@@ -7,9 +7,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { lastRestocked, ...rest } = body
   const item = await prisma.inventoryItem.update({
     where: { id },
-    data: { ...rest, lastRestocked: lastRestocked ? new Date(lastRestocked) : undefined },
+    data: {
+      ...rest,
+      storageQuantity: rest?.storageQuantity === undefined ? undefined : Number(rest.storageQuantity ?? 0),
+      lastRestocked: lastRestocked ? new Date(lastRestocked) : undefined,
+    },
   })
-  return NextResponse.json({ ...item, lastRestocked: item.lastRestocked?.toISOString() ?? undefined })
+  return NextResponse.json({ ...item, storageQuantity: Number(item.storageQuantity ?? 0), lastRestocked: item.lastRestocked?.toISOString() ?? undefined })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

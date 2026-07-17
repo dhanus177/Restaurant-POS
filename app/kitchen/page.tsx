@@ -8,15 +8,19 @@ import { Header } from '@/components/shared/header'
 import { OrderQueue } from '@/components/kitchen/order-queue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Volume2, VolumeX, RefreshCw } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { matchesKitchenScanInput } from '@/lib/print'
+import { toast } from 'sonner'
+import { Volume2, VolumeX, RefreshCw, ScanBarcode, CheckCircle2 } from 'lucide-react'
 
 export default function KitchenPage() {
   const router = useRouter()
-  const { currentUser, orders, settings } = usePOSStore()
+  const { currentUser, orders, settings, updateOrderStatus } = usePOSStore()
   const [mounted, setMounted] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [lastOrderCount, setLastOrderCount] = useState(0)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [kitchenScanInput, setKitchenScanInput] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -64,6 +68,34 @@ export default function KitchenPage() {
     setRefreshKey((k) => k + 1)
   }, [])
 
+  const handleKitchenScanConfirm = useCallback(() => {
+    const scanValue = kitchenScanInput.trim()
+    if (!scanValue) {
+      toast.error('Scan or enter a kitchen barcode/order number first')
+      return
+    }
+
+    const targetOrder = orders.find((order) => {
+      if (order.status === 'cancelled') return false
+      return matchesKitchenScanInput(order.orderNumber, order.createdAt, scanValue)
+    })
+
+    if (!targetOrder) {
+      toast.error('No matching kitchen order found for this scan')
+      return
+    }
+
+    if (targetOrder.status === 'completed') {
+      toast.info(`Order #${targetOrder.orderNumber} is already completed`)
+      setKitchenScanInput('')
+      return
+    }
+
+    updateOrderStatus(targetOrder.id, 'completed')
+    toast.success(`Kitchen order #${targetOrder.orderNumber} marked completed`)
+    setKitchenScanInput('')
+  }, [kitchenScanInput, orders, updateOrderStatus])
+
   if (!mounted || !currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -88,45 +120,69 @@ export default function KitchenPage() {
       <Header title="Kitchen Display" />
 
       {/* Status Bar */}
-      <div className="flex flex-col gap-3 border-b border-border bg-card px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+      <div className="flex flex-col gap-3 border-b border-border bg-card px-3 py-2 sm:px-4">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-          <Badge variant={pendingCount > 0 ? 'default' : 'secondary'} className="text-sm px-3 py-1">
+          <Badge
+            variant={pendingCount > 0 ? 'default' : 'secondary'}
+            className="px-3 py-1 text-sm data-[state=active]:bg-primary"
+          >
             {pendingCount} New Orders
           </Badge>
           {pendingCount > 3 && (
-            <Badge variant="destructive" className="text-sm">
+            <Badge variant="destructive" className="text-sm font-semibold tracking-wide">
               High Volume
             </Badge>
           )}
+          <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="sm:inline">Refresh</span>
+            </Button>
+            <Button
+              variant={soundEnabled ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
+            >
+              {soundEnabled ? (
+                <>
+                  <Volume2 className="h-4 w-4" />
+                  <span>Sound On</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="h-4 w-4" />
+                  <span>Sound Off</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleManualRefresh}
-            className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="sm:inline">Refresh</span>
-          </Button>
-          <Button
-            variant={soundEnabled ? 'secondary' : 'outline'}
-            size="sm"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="h-10 flex-1 gap-2 sm:h-9 sm:flex-none"
-          >
-            {soundEnabled ? (
-              <>
-                <Volume2 className="h-4 w-4" />
-                <span>Sound On</span>
-              </>
-            ) : (
-              <>
-                <VolumeX className="h-4 w-4" />
-                <span>Sound Off</span>
-              </>
-            )}
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-[minmax(320px,1fr)_auto]">
+          <div className="relative">
+            <ScanBarcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={kitchenScanInput}
+              onChange={(event) => setKitchenScanInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  handleKitchenScanConfirm()
+                }
+              }}
+              placeholder="Scan KOT barcode / enter order number"
+              className="h-10 pl-9 text-sm"
+            />
+          </div>
+          <Button className="h-10 gap-2" onClick={handleKitchenScanConfirm}>
+            <CheckCircle2 className="h-4 w-4" />
+            Confirm & Complete
           </Button>
         </div>
       </div>

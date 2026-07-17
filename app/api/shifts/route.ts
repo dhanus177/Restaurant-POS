@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
 
-  const actor = await requireRole(req, ['admin', 'super-admin', 'pay-counter'])
+  const actor = await requireRole(req, ['admin', 'super-admin', 'cashier'])
   if (!actor.ok) return actor.response
 
   const shifts = await prisma.shift.findMany({
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
 
-  const actor = await requireRole(req, ['admin', 'super-admin', 'pay-counter'])
+  const actor = await requireRole(req, ['admin', 'super-admin', 'cashier'])
   if (!actor.ok) return actor.response
 
   const existingOpenShift = await prisma.shift.findFirst({ where: { status: 'open' } })

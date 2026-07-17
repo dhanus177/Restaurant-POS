@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { randomUUID } from 'node:crypto'
 
-function toAppOrder(order: any) {
+function toAppOrder(order: any, prepStationByMenuItemId: Map<string, string> = new Map()) {
   return {
     ...order,
     createdAt: order.createdAt.toISOString(),
@@ -9,8 +10,20 @@ function toAppOrder(order: any) {
     items: order.items.map((item: any) => ({
       ...item,
       modifiers: item.modifiers ?? [],
+      prepStation: item.prepStation ?? prepStationByMenuItemId.get(item.menuItemId) ?? 'kitchen',
     })),
   }
+}
+
+async function buildPrepStationMap(menuItemIds: string[]) {
+  if (menuItemIds.length === 0) return new Map<string, string>()
+
+  const menuItems = await prisma.menuItem.findMany({
+    where: { id: { in: menuItemIds } },
+    select: { id: true, prepStation: true },
+  })
+
+  return new Map(menuItems.map((item) => [item.id, item.prepStation]))
 }
 
 export async function GET() {
@@ -18,30 +31,47 @@ export async function GET() {
     include: { items: true },
     orderBy: { createdAt: 'desc' },
   })
-  return NextResponse.json(orders.map(toAppOrder))
+  const menuItemIds = Array.from(
+    new Set(orders.flatMap((order) => order.items.map((item) => item.menuItemId)).filter(Boolean))
+  )
+  const prepStationByMenuItemId = await buildPrepStationMap(menuItemIds)
+  return NextResponse.json(orders.map((order) => toAppOrder(order, prepStationByMenuItemId)))
 }
 
 export async function POST(req: Request) {
-  const body = await req.json()
-  const { items, createdAt, updatedAt, ...rest } = body
-  const order = await prisma.order.create({
-    data: {
-      ...rest,
-      createdAt: createdAt ? new Date(createdAt) : undefined,
-      items: {
-        create: items.map((item: any) => ({
-          id: item.id,
-          menuItemId: item.menuItemId,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          modifiers: item.modifiers ?? [],
-          notes: item.notes ?? null,
-          chairNumber: item.chairNumber ?? null,
-        })),
+  try {
+    const body = await req.json()
+    const { items, createdAt, updatedAt, ...rest } = body
+    const safeItems = Array.isArray(items) ? items : []
+
+    const order = await prisma.order.create({
+      data: {
+        ...rest,
+        createdAt: createdAt ? new Date(createdAt) : undefined,
+        items: {
+          create: safeItems.map((item: any, index: number) => ({
+            id: `${randomUUID()}-${index}`,
+            menuItemId: item.menuItemId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            modifiers: item.modifiers ?? [],
+            prepStation: typeof item.prepStation === 'string' ? item.prepStation : 'kitchen',
+            notes: item.notes ?? null,
+            chairNumber: item.chairNumber ?? null,
+          })),
+        },
       },
-    },
-    include: { items: true },
-  })
-  return NextResponse.json(toAppOrder(order), { status: 201 })
+      include: { items: true },
+    })
+
+    const prepStationByMenuItemId = await buildPrepStationMap(
+      Array.from(new Set(order.items.map((item: any) => item.menuItemId).filter(Boolean)))
+    )
+
+    return NextResponse.json(toAppOrder(order, prepStationByMenuItemId), { status: 201 })
+  } catch (error) {
+    console.error('[orders POST error]', error)
+    return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
+  }
 }

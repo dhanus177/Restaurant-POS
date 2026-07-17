@@ -13,7 +13,7 @@ import { ListFilter, RefreshCw, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import type { AuditLog } from '@/lib/types'
 
-type RoleFilter = 'all' | 'super-admin' | 'admin' | 'pay-counter' | 'cashier' | 'kitchen' | 'takeaway'
+type RoleFilter = 'all' | 'super-admin' | 'admin' | 'biller' | 'cashier' | 'kitchen' | 'takeaway'
 
 export default function ActivityLogPage() {
   const { currentUser } = usePOSStore()
@@ -131,7 +131,7 @@ export default function ActivityLogPage() {
               <SelectItem value="all">All roles</SelectItem>
               <SelectItem value="super-admin">Super Admin</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
-              <SelectItem value="pay-counter">Pay Counter</SelectItem>
+              <SelectItem value="biller">Biller</SelectItem>
               <SelectItem value="cashier">Cashier</SelectItem>
               <SelectItem value="kitchen">Kitchen</SelectItem>
               <SelectItem value="takeaway">Takeaway</SelectItem>

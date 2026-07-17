@@ -114,6 +114,7 @@ model OrderItem {
   quantity   Int
   price      Float
   modifiers  Json   @default("[]")
+  prepStation String?
   notes      String?
   chairNumber Int?
 }
@@ -154,6 +155,7 @@ model InventoryItem {
   name          String
   sku           String            @unique
   quantity      Float
+  storageQuantity Float           @default(0)
   unit          String
   minQuantity   Float
   costPrice     Float
@@ -210,6 +212,11 @@ model Settings {
   whatsappDinnerTime     String  @default("22:00")
   customRoles            Json?
   waiterVisibleCategoryIds Json?
+  billerPrinterName      String?
+  kitchenPrinterName     String?
+  takeawayPrinterName    String?
+  supplierStatementPrinterName String?
+  forceDesktopPrintOnly  Boolean @default(true)
 }
 
 model WhatsAppReportDispatch {

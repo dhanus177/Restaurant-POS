@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
 
-  const actor = await requireRole(req, ['admin', 'super-admin', 'pay-counter'])
+  const actor = await requireRole(req, ['admin', 'super-admin', 'cashier'])
   if (!actor.ok) return actor.response
 
   const expenses = await prisma.cashDrawerExpense.findMany({ orderBy: { createdAt: 'desc' } })
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
 
-  const actor = await requireRole(req, ['admin', 'super-admin', 'pay-counter'])
+  const actor = await requireRole(req, ['admin', 'super-admin', 'cashier'])
   if (!actor.ok) return actor.response
 
   const body = await req.json()
