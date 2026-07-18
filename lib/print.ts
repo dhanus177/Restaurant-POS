@@ -626,6 +626,45 @@ export function printDocument(
   html: string,
   printerName?: string | null
 ): void {
+  const htmlToRawText = (value: string) => {
+    if (typeof window !== 'undefined' && typeof DOMParser !== 'undefined') {
+      const doc = new DOMParser().parseFromString(value, 'text/html')
+      const text = doc.body?.innerText ?? ''
+      return text.replace(/\n{3,}/g, '\n\n').trim()
+    }
+
+    return value
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  const printViaAgent = async (printerId: string, rawText: string) => {
+    try {
+      const response = await fetch('/api/print-agent/print', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          printerId,
+          data: rawText,
+          format: 'raw',
+          maxRetries: 3,
+        }),
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      const payload = (await response.json().catch(() => null)) as { success?: boolean } | null
+      return payload?.success !== false
+    } catch {
+      return false
+    }
+  }
+
   const browserPrint = () => {
     const iframe = document.createElement('iframe')
     iframe.setAttribute('aria-hidden', 'true')
@@ -681,6 +720,16 @@ export function printDocument(
 
     document.body.appendChild(iframe)
     iframe.src = 'about:blank'
+  }
+
+  if (printerName && printerName.trim().length > 0) {
+    const rawText = htmlToRawText(html)
+    void printViaAgent(printerName, rawText).then((printed) => {
+      if (!printed) {
+        browserPrint()
+      }
+    })
+    return
   }
 
   browserPrint()

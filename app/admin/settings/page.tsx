@@ -739,7 +739,7 @@ export default function SettingsPage() {
             Printer Settings
           </CardTitle>
           <CardDescription>
-            Select printers for each station from the detected system printers, or enter a custom printer name.
+            Select printer IDs discovered from your local print agent (USB + Network/TCP), or enter a custom printer ID manually.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
