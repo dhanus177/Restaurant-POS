@@ -27,38 +27,36 @@ function isPrivateOrLocalHost(hostname: string): boolean {
   return false
 }
 
+type SessionCookieSecureDecision = {
+  secure: boolean
+  reason: 'override' | 'https' | 'private-host' | 'production-fallback' | 'disabled'
+  requestProtocol: string | null
+  forwardedProto: string | null
+  host: string | null
+}
+
+function resolveSessionCookieSecureDecision(req?: Request): SessionCookieSecureDecision {
+  const forwardedProto = req?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase() ?? null
+  let url: URL | null = null
+  try {
+    if (req?.url) {
+      url = new URL(req.url)
+    }
+  } catch {
+    // Ignore invalid URL and default to non-secure
+  }
+
+  return {
+    secure: false,
+    reason: 'disabled',
+    requestProtocol: url?.protocol ?? null,
+    forwardedProto,
+    host: url?.host ?? null,
+  }
+}
+
 function resolveSessionCookieSecure(req?: Request): boolean {
-  if (SESSION_COOKIE_SECURE_OVERRIDE !== null) {
-    return SESSION_COOKIE_SECURE_OVERRIDE
-  }
-
-  try {
-    if (req?.url) {
-      const url = new URL(req.url)
-      if (isPrivateOrLocalHost(url.hostname)) {
-        return false
-      }
-    }
-  } catch {
-    // Continue with other heuristics below
-  }
-
-  const forwardedProto = req?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
-  if (forwardedProto) {
-    return forwardedProto === 'https'
-  }
-
-  try {
-    if (req?.url) {
-      const url = new URL(req.url)
-      if (url.protocol === 'https:') return true
-      if (isPrivateOrLocalHost(url.hostname)) return false
-    }
-  } catch {
-    // Fall back below
-  }
-
-  return process.env.NODE_ENV === 'production'
+  return resolveSessionCookieSecureDecision(req).secure
 }
 
 function parseCookies(cookieHeader: string | null) {

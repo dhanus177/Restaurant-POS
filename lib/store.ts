@@ -701,7 +701,16 @@ const response = await apiFetch('/api/auth/me', {
       // DB sync
       loadFromDB: async () => {
         try {
-          await get().refreshCurrentUser()
+          const currentUser = await get().refreshCurrentUser()
+
+          if (!currentUser) {
+            const settings = await apiFetch('/api/settings').then((r) => (r.ok ? r.json() : Promise.resolve(null)))
+            if (settings && !settings.error) {
+              set({ settings: { ...DEFAULT_SETTINGS, ...settings } })
+            }
+            return
+          }
+
           const [users, customers, categories, menuItems, tables, orders, inventory, suppliers, cashDrawer, cashDrawerExpenses, cashDrawerReports, stockAdjustments, settings] =
             await Promise.all([
               apiFetch('/api/users').then((r) => (r.ok ? r.json() : Promise.resolve(null))),

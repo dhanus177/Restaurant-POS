@@ -26,18 +26,17 @@ model Category {
 }
 
 model MenuItem {
-  id             String          @id
-  name           String
-  price          Float
-  categoryId     String
-  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  description    String?
-  image          String?
-  isAvailable    Boolean         @default(true)
-  applyServiceCharge Boolean     @default(false)
-  prepStation    String          @default("kitchen")
-  modifierGroups ModifierGroup[]
-  recipes        ProductRecipe[]
+  id                 String          @id
+  name               String
+  price              Float
+  categoryId         String
+  description        String?
+  image              String?
+  isAvailable        Boolean         @default(true)
+  applyServiceCharge Boolean         @default(false)
+  category           Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  modifierGroups     ModifierGroup[]
+  recipes            ProductRecipe[]
 }
 
 model ModifierGroup {
@@ -46,8 +45,8 @@ model ModifierGroup {
   required      Boolean
   maxSelections Int
   menuItemId    String
-  menuItem      MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
   modifiers     Modifier[]
+  menuItem      MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
 }
 
 model Modifier {
@@ -68,59 +67,58 @@ model RestaurantTable {
 }
 
 model Order {
-  id            String      @id
-  orderNumber   Int
-  tableId       String?
-  tableName     String?
-  customerId    String?
-  customerName  String?
-  customerPhone String?
-  subtotal      Float
-  tax           Float
-  total         Float
-  status        String
-  paymentMethod String?
-  paymentStatus String
+  id                 String      @id
+  orderNumber        Int
+  tableId            String?
+  tableName          String?
+  customerId         String?
+  customerName       String?
+  customerPhone      String?
+  subtotal           Float
+  tax                Float
+  total              Float
+  status             String
+  paymentMethod      String?
+  paymentStatus      String
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  createdBy          String
+  isPriority         Boolean     @default(false)
   paymentCollectedBy String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  createdBy     String
-  isPriority    Boolean     @default(false)
-  customer      Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  items         OrderItem[]
+  customer           Customer?   @relation(fields: [customerId], references: [id])
+  items              OrderItem[]
 }
 
 model Customer {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   name          String
   phone         String?
   email         String?
   notes         String?
-  loyaltyPoints Int      @default(0)
-  lifetimeSpent Float    @default(0)
-  orderCount    Int      @default(0)
+  loyaltyPoints Int       @default(0)
+  lifetimeSpent Float     @default(0)
+  orderCount    Int       @default(0)
   lastOrderAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   orders        Order[]
 }
 
 model OrderItem {
-  id         String @id
-  orderId    String
-  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItemId String
-  name       String
-  quantity   Int
-  price      Float
-  modifiers  Json   @default("[]")
-  prepStation String?
-  notes      String?
+  id          String  @id
+  orderId     String
+  menuItemId  String
+  name        String
+  quantity    Int
+  price       Float
+  modifiers   Json    @default("[]")
+  notes       String?
   chairNumber Int?
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 model Supplier {
-  id             String          @id
+  id             String                @id
   name           String
   contact        String
   email          String
@@ -130,42 +128,37 @@ model Supplier {
 }
 
 model SupplierLedgerEntry {
-  id              String   @id @default(cuid())
+  id              String         @id @default(cuid())
   supplierId      String
-  supplier        Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   type            String
   reference       String?
   inventoryItemId String?
-  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   quantity        Float?
   amount          Float
-  paymentMethod   String?
-  linkedEntryId   String?
-  billItems       Json?
   notes           String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime       @default(now())
+  inventoryItem   InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+  supplier        Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@index([supplierId])
   @@index([type])
-  @@index([linkedEntryId])
 }
 
 model InventoryItem {
-  id            String            @id
-  name          String
-  sku           String            @unique
-  quantity      Float
-  storageQuantity Float           @default(0)
-  unit          String
-  minQuantity   Float
-  costPrice     Float
-  supplierId    String?
-  supplier      Supplier?         @relation(fields: [supplierId], references: [id])
-  lastRestocked DateTime?
-  category      String
-  adjustments   StockAdjustment[]
-  recipes       ProductRecipe[]   @relation("RecipeIngredient")
+  id                    String                @id
+  name                  String
+  sku                   String                @unique
+  quantity              Float
+  unit                  String
+  minQuantity           Float
+  costPrice             Float
+  supplierId            String?
+  lastRestocked         DateTime?
+  category              String
+  supplier              Supplier?             @relation(fields: [supplierId], references: [id])
+  adjustments           StockAdjustment[]
   supplierLedgerEntries SupplierLedgerEntry[]
+  recipes               ProductRecipe[]       @relation("RecipeIngredient")
 }
 
 model ProductRecipe {
@@ -173,8 +166,8 @@ model ProductRecipe {
   productId    String        @map("product_id")
   ingredientId String        @map("ingredient_id")
   quantity     Float
-  product      MenuItem      @relation(fields: [productId], references: [id], onDelete: Cascade)
   ingredient   InventoryItem @relation("RecipeIngredient", fields: [ingredientId], references: [id], onDelete: Cascade)
+  product      MenuItem      @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([ingredientId])
@@ -184,39 +177,32 @@ model ProductRecipe {
 model StockAdjustment {
   id              String        @id
   inventoryItemId String
-  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
   type            String
   quantity        Float
   reason          String
   createdAt       DateTime      @default(now())
   createdBy       String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
 }
 
 model Settings {
-  id             String  @id @default("singleton")
-  restaurantName String
-  address        String
-  phone          String
-  taxRate        Float
-  currency       String
-  currencySymbol String
-  receiptFooter  String
-  logo           String?
+  id                         String  @id @default("singleton")
+  restaurantName             String
+  address                    String
+  phone                      String
+  taxRate                    Float
+  currency                   String
+  currencySymbol             String
+  receiptFooter              String
+  logo                       String?
   requireCustomerBeforeOrder Boolean @default(false)
-  takeawayPageEnabled Boolean @default(true)
-  kitchenPageEnabled  Boolean @default(true)
-  whatsappReportsEnabled Boolean @default(false)
-  whatsappRecipient      String?
-  whatsappBreakfastTime  String  @default("11:00")
-  whatsappLunchTime      String  @default("16:00")
-  whatsappDinnerTime     String  @default("22:00")
-  customRoles            Json?
-  waiterVisibleCategoryIds Json?
-  billerPrinterName      String?
-  kitchenPrinterName     String?
-  takeawayPrinterName    String?
-  supplierStatementPrinterName String?
-  forceDesktopPrintOnly  Boolean @default(true)
+  kitchenPageEnabled         Boolean @default(true)
+  takeawayPageEnabled        Boolean @default(true)
+  whatsappBreakfastTime      String  @default("11:00")
+  whatsappDinnerTime         String  @default("22:00")
+  whatsappLunchTime          String  @default("16:00")
+  whatsappRecipient          String?
+  whatsappReportsEnabled     Boolean @default(false)
 }
 
 model WhatsAppReportDispatch {
@@ -231,71 +217,71 @@ model WhatsAppReportDispatch {
 }
 
 model CashDrawer {
-  id             String   @id @default("singleton")
-  openingBalance Float    @default(0)
+  id             String              @id @default("singleton")
+  openingBalance Float               @default(0)
   notes          String?
   openedAt       DateTime?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime            @updatedAt
   expenses       CashDrawerExpense[]
 }
 
 model CashDrawerExpense {
-  id          String   @id @default(cuid())
-  drawerId    String   @default("singleton")
-  drawer      CashDrawer @relation(fields: [drawerId], references: [id], onDelete: Cascade)
-  amount      Float
-  reason      String
-  createdAt   DateTime @default(now())
-  createdBy   String
+  id        String     @id @default(cuid())
+  drawerId  String     @default("singleton")
+  amount    Float
+  reason    String
+  createdAt DateTime   @default(now())
+  createdBy String
+  drawer    CashDrawer @relation(fields: [drawerId], references: [id], onDelete: Cascade)
 
   @@index([drawerId])
   @@index([createdAt])
 }
 
 model CashDrawerReport {
-  id             String   @id @default(cuid())
-  openingBalance Float
+  id              String   @id @default(cuid())
+  openingBalance  Float
   expectedBalance Float
-  countedCash    Float
-  variance       Float
-  notes          String?
-  closedAt       DateTime @default(now())
-  closedBy       String
+  countedCash     Float
+  variance        Float
+  notes           String?
+  closedAt        DateTime @default(now())
+  closedBy        String
 }
 
 model License {
-  id            String   @id @default("singleton")
-  activationKey String   @unique
+  id            String    @id @default("singleton")
+  activationKey String    @unique
   status        String
-  tier          String   @default("standard")
-  issuedAt      DateTime @default(now())
+  tier          String    @default("standard")
+  issuedAt      DateTime  @default(now())
   activatedAt   DateTime?
   expiresAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model Session {
   id        String   @id @default(cuid())
   token     String   @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  action      String
-  resource    String
-  resourceId  String?
-  details     Json?
-  actorId     String?
-  actorName   String?
-  actorRole   String?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  actorId    String?
+  actorName  String?
+  actorRole  String?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
 
   @@index([createdAt])
   @@index([action])
@@ -304,14 +290,14 @@ model AuditLog {
 }
 
 model BackupSchedule {
-  id             String   @id @default("singleton")
-  enabled        Boolean  @default(false)
-  frequencyHours Int      @default(24)
-  retentionCount Int      @default(14)
-  verifyChecksum Boolean  @default(true)
+  id             String    @id @default("singleton")
+  enabled        Boolean   @default(false)
+  frequencyHours Int       @default(24)
+  retentionCount Int       @default(14)
+  verifyChecksum Boolean   @default(true)
   lastRunAt      DateTime?
   nextRunAt      DateTime?
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
 }
 
 model BackupSnapshot {
@@ -330,20 +316,20 @@ model BackupSnapshot {
 }
 
 model Shift {
-  id           String   @id @default(cuid())
-  openedAt     DateTime @default(now())
-  openedBy     String
-  openingFloat Float
-  status       String   @default("open")
-  notes        String?
-  closedAt     DateTime?
-  closedBy     String?
-  expectedCash Float?
-  countedCash  Float?
-  variance     Float?
+  id            String    @id @default(cuid())
+  openedAt      DateTime  @default(now())
+  openedBy      String
+  openingFloat  Float
+  status        String    @default("open")
+  notes         String?
+  closedAt      DateTime?
+  closedBy      String?
+  expectedCash  Float?
+  countedCash   Float?
+  variance      Float?
   denominations Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([status])
   @@index([openedAt])
