@@ -388,18 +388,24 @@ export function generateReceiptHTML(order: Order, settings: Settings): string {
   `
 }
 
-export function generateKitchenDocketHTML(order: Order, settings: Settings): string {
+export function generateKitchenDocketHTML(
+  order: Order,
+  settings: Settings,
+  options?: { addonItemIds?: string[] }
+): string {
   const kitchenCode = generateKitchenOrderCode(order.orderNumber, order.createdAt)
   const isTakeaway = !order.tableId
   const orderKindLabel = isTakeaway ? 'TAKEAWAY ORDER' : 'TABLE ORDER'
   const stationLabel = isTakeaway ? 'TAKEAWAY KITCHEN' : 'TABLE KITCHEN'
   const prepCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
+  const addonItemIds = new Set(options?.addonItemIds ?? [])
   const itemsHTML = order.items
     .map(
       (item) => `
     <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
       <div style="font-size: 20px; font-weight: bold;">
         ${item.quantity}x ${item.name}
+        ${addonItemIds.has(item.id) ? '<div style="display: inline-block; font-size: 11px; margin-top: 4px; margin-left: 6px; padding: 2px 6px; border: 1px solid #b45309; border-radius: 999px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #92400e; background: #fef3c7;">ADD-ON</div>' : ''}
         <div style="display: inline-block; font-size: 11px; margin-top: 4px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #111; background: #f5f5f5;">
           [${(item.prepStation ?? 'kitchen').toUpperCase().replace('-', ' ')}]
         </div>
@@ -531,17 +537,23 @@ export function generateTakeawayDocketHTML(order: Order, settings: Settings): st
   `
 }
 
-export function generateBenMarieDocketHTML(order: Order, settings: Settings): string {
+export function generateBenMarieDocketHTML(
+  order: Order,
+  settings: Settings,
+  options?: { addonItemIds?: string[] }
+): string {
   const benMarieCode = generateBenMarieOrderCode(order.orderNumber, order.createdAt)
   const isTakeaway = !order.tableId
   const orderKindLabel = isTakeaway ? 'TAKEAWAY ORDER' : 'TABLE ORDER'
   const prepCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
+  const addonItemIds = new Set(options?.addonItemIds ?? [])
   const itemsHTML = order.items
     .map(
       (item) => `
     <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
       <div style="font-size: 20px; font-weight: bold;">
         ${item.quantity}x ${item.name}
+        ${addonItemIds.has(item.id) ? '<div style="display: inline-block; font-size: 11px; margin-top: 4px; margin-left: 6px; padding: 2px 6px; border: 1px solid #b45309; border-radius: 999px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #92400e; background: #fef3c7;">ADD-ON</div>' : ''}
         <div style="display: inline-block; font-size: 11px; margin-top: 4px; padding: 2px 6px; border: 1px solid #111; border-radius: 4px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #111; background: #f5f5f5;">
           [${(item.prepStation ?? 'ben-marie').toUpperCase().replace('-', ' ')}]
         </div>
@@ -707,7 +719,11 @@ export function printReceipt(order: Order, settings: Settings): void {
   printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
-export function printKitchenDocket(order: Order, settings: Settings): void {
+export function printKitchenDocket(
+  order: Order,
+  settings: Settings,
+  options?: { addonItemIds?: string[] }
+): void {
   if (order.items.length === 0) {
     return
   }
@@ -717,7 +733,8 @@ export function printKitchenDocket(order: Order, settings: Settings): void {
       ...order,
       items: order.items,
     },
-    settings
+    settings,
+    options
   )
   printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
@@ -727,19 +744,22 @@ export function printTakeawayDocket(order: Order, settings: Settings): void {
   printDocument(html, settings.takeawayPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
-export function printBenMarieDocket(order: Order, settings: Settings): void {
-  const benMarieItems = order.items.filter((item) => item.prepStation === 'ben-marie')
-
-  if (benMarieItems.length === 0) {
+export function printBenMarieDocket(
+  order: Order,
+  settings: Settings,
+  options?: { addonItemIds?: string[] }
+): void {
+  if (order.items.length === 0) {
     return
   }
 
   const html = generateBenMarieDocketHTML(
     {
       ...order,
-      items: benMarieItems,
+      items: order.items,
     },
-    settings
+    settings,
+    options
   )
 
   // Uses cash counter printer route as requested workflow for dockets.

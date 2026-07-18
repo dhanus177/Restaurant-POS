@@ -444,12 +444,10 @@ export default function WaiterPage() {
 
   const buildStationOrders = (itemsForStation: Order['items'], station: 'kitchen' | 'ben-marie'): Order[] => {
     const now = new Date().toISOString()
-    const stationItems = itemsForStation
-      .filter((item) => (item.prepStation ?? 'kitchen') === station)
-      .map((item) => ({
-        ...item,
-        chairNumber: item.chairNumber ?? selectedChair,
-      }))
+    const stationItems = itemsForStation.map((item) => ({
+      ...item,
+      chairNumber: item.chairNumber ?? selectedChair,
+    }))
 
     if (stationItems.length === 0) return []
 
@@ -490,6 +488,25 @@ export default function WaiterPage() {
         createdBy: currentUser?.id || 'unknown',
       }
     })
+  }
+
+  const getSharedStationOrderNumberForChairs = (chairNumbers: number[]): number | null => {
+    if (!selectedTable || chairNumbers.length === 0) return null
+
+    const normalizedChairs = Array.from(new Set(chairNumbers)).sort((a, b) => a - b)
+    const matchingNumbers = orders
+      .filter((order) => {
+        if (order.paymentStatus !== 'pending') return false
+        if (!(isKitchenDocketOrder(order) || isBenMarieDocketOrder(order))) return false
+        if (order.tableId !== selectedTable.id) return false
+
+        const orderChairs = getOrderChairNumbers(order)
+        return orderChairs.length === 1 && normalizedChairs.includes(orderChairs[0])
+      })
+      .map((order) => order.orderNumber)
+      .sort((a, b) => a - b)
+
+    return matchingNumbers[0] ?? null
   }
 
   const getUnsentStationCartItems = (station: 'kitchen' | 'ben-marie', chairScope: number[] = dispatchChairNumbers) => {
@@ -552,7 +569,8 @@ export default function WaiterPage() {
         const groupedOrdersToSend: Order[] = []
         const targetOrderIds: string[] = []
 
-        let nextGroupOrderNumber = getNextOrderNumber()
+        const sharedGroupOrderNumber = getSharedStationOrderNumberForChairs(groupToSend)
+        let nextGroupOrderNumber = sharedGroupOrderNumber ?? getNextOrderNumber()
 
         const groupItems = tableScopedCart.filter((item) => groupToSend.includes(item.chairNumber ?? selectedChair))
         if (groupItems.length > 0) {
@@ -600,7 +618,12 @@ export default function WaiterPage() {
       }
 
       const groupAsSingleBill = handoffMode === 'multi' && dispatchChairNumbers.length > 1
-      const ordersToSend = buildPendingOrders(dispatchItems, groupAsSingleBill)
+      const sharedDispatchOrderNumber = getSharedStationOrderNumberForChairs(dispatchChairNumbers)
+      const ordersToSend = buildPendingOrders(
+        dispatchItems,
+        groupAsSingleBill,
+        sharedDispatchOrderNumber ?? undefined
+      )
       const targetOrderIds: string[] = []
 
       ordersToSend.forEach((order) => {
@@ -632,8 +655,18 @@ export default function WaiterPage() {
           })
           targetOrderIds.push(existingChairBill.id)
         } else {
-          addOrder(order)
-          targetOrderIds.push(order.id)
+          const chairNumber = getOrderChairNumber(order)
+          const sharedChairOrderNumber =
+            typeof chairNumber === 'number' ? getSharedStationOrderNumberForChairs([chairNumber]) : null
+          const orderToAdd = sharedChairOrderNumber
+            ? {
+                ...order,
+                orderNumber: sharedChairOrderNumber,
+              }
+            : order
+
+          addOrder(orderToAdd)
+          targetOrderIds.push(orderToAdd.id)
         }
       })
 
@@ -665,16 +698,24 @@ export default function WaiterPage() {
     }
   }
 
-  const sendStationDockets = async (station: 'kitchen' | 'ben-marie') => {
+  const sendStationDockets = async (
+    station: 'kitchen' | 'ben-marie',
+    sharedOrderNumbersByChair?: Map<number, number>
+  ) => {
     const stationLabel = station === 'kitchen' ? 'Kitchen' : 'Ben-Marie'
-    const stationItemsAll = dispatchItems.filter((item) => (item.prepStation ?? 'kitchen') === station)
+    const stationItemsAll = dispatchItems
 
     if (stationItemsAll.length === 0) {
       return { sent: false, stationLabel, ordersCount: 0 }
     }
 
     try {
-      const stationItemsToPrint = getUnsentStationCartItems(station, dispatchChairNumbers)
+      const sentKey = station === 'kitchen' ? 'kitchenSentAt' : 'benMarieSentAt'
+      const stationItemsToPrint = tableScopedCart.filter(
+        (item) =>
+          dispatchChairNumbers.includes(item.chairNumber ?? selectedChair) &&
+          !(item as any)[sentKey]
+      )
       if (stationItemsToPrint.length === 0) {
         return { sent: false, stationLabel, ordersCount: 0 }
       }
@@ -682,9 +723,13 @@ export default function WaiterPage() {
       const stationOrders = buildStationOrders(stationItemsAll, station)
       const targetOrderIds: string[] = []
       const sentAt = new Date().toISOString()
+      let nextStationOrderNumber = getNextOrderNumber()
 
       stationOrders.forEach((order) => {
         const chairNumber = getOrderChairNumber(order)
+        const addonItemIdsForChair = stationItemsToPrint
+          .filter((item) => (item.chairNumber ?? selectedChair) === (chairNumber ?? selectedChair))
+          .map((item) => item.id)
         const existingStationOrder = orders.find((existingOrder) => {
           if (existingOrder.paymentStatus !== 'pending') return false
           if (station === 'kitchen' ? !isKitchenDocketOrder(existingOrder) : !isBenMarieDocketOrder(existingOrder)) return false
@@ -697,27 +742,60 @@ export default function WaiterPage() {
         })
 
         if (existingStationOrder) {
-          updateOrder(existingStationOrder.id, {
+          const updatedStationOrder: Order = {
+            ...existingStationOrder,
             items: order.items,
             subtotal: order.subtotal,
             tax: order.tax,
             total: order.total,
             updatedAt: new Date().toISOString(),
+          }
+
+          updateOrder(existingStationOrder.id, {
+            items: updatedStationOrder.items,
+            subtotal: updatedStationOrder.subtotal,
+            tax: updatedStationOrder.tax,
+            total: updatedStationOrder.total,
+            updatedAt: updatedStationOrder.updatedAt,
           })
+
           if (station === 'kitchen') {
-            printKitchenDocket(order, settings)
+            printKitchenDocket(updatedStationOrder, settings, { addonItemIds: addonItemIdsForChair })
           } else {
-            printBenMarieDocket(order, settings)
+            printBenMarieDocket(updatedStationOrder, settings, { addonItemIds: addonItemIdsForChair })
           }
           targetOrderIds.push(existingStationOrder.id)
         } else {
-          addOrder(order)
-          if (station === 'kitchen') {
-            printKitchenDocket(order, settings)
-          } else {
-            printBenMarieDocket(order, settings)
+          const mappedOrderNumber =
+            typeof chairNumber === 'number' && sharedOrderNumbersByChair
+              ? sharedOrderNumbersByChair.get(chairNumber)
+              : undefined
+          const reusedStationNumber =
+            mappedOrderNumber ??
+            (typeof chairNumber === 'number' ? getSharedStationOrderNumberForChairs([chairNumber]) ?? undefined : undefined)
+          const assignedOrderNumber = reusedStationNumber ?? nextStationOrderNumber
+
+          if (reusedStationNumber === undefined) {
+            nextStationOrderNumber += 1
           }
-          targetOrderIds.push(order.id)
+
+          if (typeof chairNumber === 'number' && sharedOrderNumbersByChair) {
+            sharedOrderNumbersByChair.set(chairNumber, assignedOrderNumber)
+          }
+
+          const newStationOrder: Order = {
+            ...order,
+            orderNumber: assignedOrderNumber,
+          }
+
+          addOrder(newStationOrder)
+
+          if (station === 'kitchen') {
+            printKitchenDocket(newStationOrder, settings)
+          } else {
+            printBenMarieDocket(newStationOrder, settings)
+          }
+          targetOrderIds.push(newStationOrder.id)
         }
       })
 
@@ -755,10 +833,9 @@ export default function WaiterPage() {
 
     setIsSendingPrep(true)
     try {
-      const [kitchenResult, benMarieResult] = await Promise.all([
-        sendStationDockets('kitchen'),
-        sendStationDockets('ben-marie'),
-      ])
+      const sharedOrderNumbersByChair = new Map<number, number>()
+      const kitchenResult = await sendStationDockets('kitchen', sharedOrderNumbersByChair)
+      const benMarieResult = await sendStationDockets('ben-marie', sharedOrderNumbersByChair)
 
       const sentStations = [kitchenResult, benMarieResult].filter((result) => result.sent)
       if (sentStations.length === 0) {
