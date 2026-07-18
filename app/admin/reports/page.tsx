@@ -26,25 +26,27 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Banknote, Download, FileSpreadsheet, FileText, ListFilter } from 'lucide-react'
+import { DollarSign, ShoppingCart, TrendingUp, CreditCard, Banknote, Download, FileSpreadsheet, FileText, ListFilter, Trash2 } from 'lucide-react'
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))']
 
-type ReportView = 'all' | 'cash-sale' | 'card-sale' | 'void-return-cancel' | 'delivery' | 'service-charges' | 'complimentary' | 'kot-accepted' | 'kot-canceled'
+type ReportView = 'all' | 'cash-sale' | 'card-sale' | 'void-return-cancel' | 'delivery' | 'service-charges' | 'complimentary' | 'kot-accepted' | 'kot-canceled' | 'wastage'
 
 export default function ReportsPage() {
-  const { orders, categories, settings } = usePOSStore()
+  const { orders, categories, settings, stockAdjustments, inventory } = usePOSStore()
   const [dateRange, setDateRange] = useState('7days')
   const [reportView, setReportView] = useState<ReportView>('all')
 
-  // Filter orders by date range
-  const filteredOrders = useMemo(() => {
+  const rangeStartDate = useMemo(() => {
     const now = new Date()
     const days = dateRange === '7days' ? 7 : dateRange === '30days' ? 30 : 1
-    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    return new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+  }, [dateRange])
 
-    return orders.filter((o) => new Date(o.createdAt) >= startDate)
-  }, [orders, dateRange])
+  // Filter orders by date range
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => new Date(o.createdAt) >= rangeStartDate)
+  }, [orders, rangeStartDate])
 
   const filteredReportOrders = useMemo(() => {
     switch (reportView) {
@@ -64,10 +66,59 @@ export default function ReportsPage() {
         return filteredOrders.filter((o) => ['preparing', 'ready', 'completed'].includes(o.status))
       case 'kot-canceled':
         return filteredOrders.filter((o) => o.status === 'cancelled')
+      case 'wastage':
+        return []
       default:
         return filteredOrders
     }
   }, [filteredOrders, reportView])
+
+  const filteredWastageAdjustments = useMemo(() => {
+    return stockAdjustments
+      .filter((adjustment) => adjustment.type === 'waste' && new Date(adjustment.createdAt) >= rangeStartDate)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  }, [stockAdjustments, rangeStartDate])
+
+  const wastageRows = useMemo(() => {
+    return filteredWastageAdjustments.map((adjustment) => {
+      const item = inventory.find((inv) => inv.id === adjustment.inventoryItemId)
+      const unit = item?.unit ?? 'units'
+      const costPrice = item?.costPrice ?? 0
+      return {
+        ...adjustment,
+        itemName: item?.name ?? 'Unknown item',
+        unit,
+        estimatedLoss: adjustment.quantity * costPrice,
+      }
+    })
+  }, [filteredWastageAdjustments, inventory])
+
+  const wastageSummary = useMemo(() => {
+    const totalQty = wastageRows.reduce((sum, row) => sum + row.quantity, 0)
+    const totalLoss = wastageRows.reduce((sum, row) => sum + row.estimatedLoss, 0)
+    const uniqueItems = new Set(wastageRows.map((row) => row.inventoryItemId)).size
+    return {
+      totalQty,
+      totalLoss,
+      eventCount: wastageRows.length,
+      uniqueItems,
+    }
+  }, [wastageRows])
+
+  const wastageByItem = useMemo(() => {
+    const grouped: Record<string, { name: string; quantity: number; estimatedLoss: number }> = {}
+    wastageRows.forEach((row) => {
+      if (!grouped[row.inventoryItemId]) {
+        grouped[row.inventoryItemId] = { name: row.itemName, quantity: 0, estimatedLoss: 0 }
+      }
+      grouped[row.inventoryItemId].quantity += row.quantity
+      grouped[row.inventoryItemId].estimatedLoss += row.estimatedLoss
+    })
+
+    return Object.values(grouped)
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 8)
+  }, [wastageRows])
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -158,6 +209,7 @@ export default function ReportsPage() {
     const complimentaryCount = filteredOrders.filter((o) => o.total === 0).length
     const kotAcceptedCount = filteredOrders.filter((o) => ['preparing', 'ready', 'completed'].includes(o.status)).length
     const kotCanceledCount = filteredOrders.filter((o) => o.status === 'cancelled').length
+    const wastageCount = filteredWastageAdjustments.length
 
     return [
       { value: 'all' as const, label: 'All Reports', count: filteredOrders.length },
@@ -169,8 +221,9 @@ export default function ReportsPage() {
       { value: 'delivery' as const, label: 'Delivery', count: deliveryCount },
       { value: 'service-charges' as const, label: 'Service Charges', count: serviceChargeCount },
       { value: 'complimentary' as const, label: 'Complimentary', count: complimentaryCount },
+      { value: 'wastage' as const, label: 'Wastage', count: wastageCount },
     ]
-  }, [filteredOrders])
+  }, [filteredOrders, filteredWastageAdjustments.length])
 
   const reportViewDescriptions: Record<ReportView, string> = {
     all: 'All orders in the selected date range.',
@@ -182,6 +235,7 @@ export default function ReportsPage() {
     delivery: 'Orders tagged as delivery in the table/order label.',
     'service-charges': 'Orders that include a dine-in service charge.',
     complimentary: 'Orders with a zero-value total, used here as complimentary orders.',
+    wastage: 'Inventory waste/spoilage movements in the selected date range.',
   }
 
   const rangeLabel = dateRange === 'today' ? 'today' : dateRange === '7days' ? 'last-7-days' : 'last-30-days'
@@ -465,6 +519,128 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
+      {reportView === 'wastage' ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Trash2 className="h-4 w-4" />
+                  Total Wastage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{wastageSummary.totalQty.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Estimated Loss
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{settings.currencySymbol}{wastageSummary.totalLoss.toFixed(2)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <ListFilter className="h-4 w-4" />
+                  Waste Events
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{wastageSummary.eventCount}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Items Affected
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{wastageSummary.uniqueItems}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Top Wastage Items</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {wastageByItem.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No wastage records for the selected range.</p>
+              ) : (
+                <div className="h-[320px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={wastageByItem}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                      <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '8px',
+                        }}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'estimatedLoss') return [`${settings.currencySymbol}${value.toFixed(2)}`, 'Estimated Loss']
+                          return [value.toFixed(2), 'Wastage Qty']
+                        }}
+                      />
+                      <Bar dataKey="quantity" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Wastage Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {wastageRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No wastage records for this report.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="min-w-[980px] w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="p-3 text-left">Date</th>
+                        <th className="p-3 text-left">Item</th>
+                        <th className="p-3 text-left">Location</th>
+                        <th className="p-3 text-right">Quantity</th>
+                        <th className="p-3 text-right">Estimated Loss</th>
+                        <th className="p-3 text-left">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wastageRows.map((row) => (
+                        <tr key={row.id} className="border-t">
+                          <td className="p-3">{new Date(row.createdAt).toLocaleString()}</td>
+                          <td className="p-3 font-medium">{row.itemName}</td>
+                          <td className="p-3 capitalize">{row.location ?? 'inventory'}</td>
+                          <td className="p-3 text-right">{row.quantity.toFixed(2)} {row.unit}</td>
+                          <td className="p-3 text-right font-semibold">{settings.currencySymbol}{row.estimatedLoss.toFixed(2)}</td>
+                          <td className="p-3">{row.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : (
+        <>
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -677,6 +853,8 @@ export default function ReportsPage() {
           )}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   )
 }

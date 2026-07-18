@@ -31,7 +31,7 @@ interface StockTableProps {
 }
 
 export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
-  const { inventory, settings } = usePOSStore()
+  const { inventory, settings, stockAdjustments } = usePOSStore()
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
 
@@ -103,7 +103,7 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
 
       {/* Table */}
       <div className="rounded-lg border border-border overflow-x-auto">
-        <Table className="min-w-[920px]">
+        <Table className="min-w-[980px]">
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
@@ -113,6 +113,7 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
               <TableHead className="text-right">Daily</TableHead>
               <TableHead className="text-right">Storage</TableHead>
               <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Waste</TableHead>
               <TableHead className="text-right">Cost</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
@@ -120,7 +121,7 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
           <TableBody>
             {filteredInventory.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No items found
                 </TableCell>
               </TableRow>
@@ -129,6 +130,9 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
                 const status = getStockStatus(item)
                 const storageQty = item.storageQuantity ?? 0
                 const totalQty = item.quantity + storageQty
+                const totalWastage = stockAdjustments
+                  .filter((adjustment) => adjustment.inventoryItemId === item.id && adjustment.type === 'waste')
+                  .reduce((sum, adjustment) => sum + adjustment.quantity, 0)
                 return (
                   <TableRow key={item.id}>
                     <TableCell>
@@ -171,6 +175,11 @@ export function StockTable({ onEdit, onAdjust, onDelete }: StockTableProps) {
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {totalQty} {item.unit}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className={totalWastage > 0 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                        {totalWastage.toFixed(2)} {item.unit}
+                      </span>
                     </TableCell>
                     <TableCell className="text-right">
                       {settings.currencySymbol}
