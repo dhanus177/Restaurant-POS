@@ -32,6 +32,17 @@ function resolveSessionCookieSecure(req?: Request): boolean {
     return SESSION_COOKIE_SECURE_OVERRIDE
   }
 
+  try {
+    if (req?.url) {
+      const url = new URL(req.url)
+      if (isPrivateOrLocalHost(url.hostname)) {
+        return false
+      }
+    }
+  } catch {
+    // Continue with other heuristics below
+  }
+
   const forwardedProto = req?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
   if (forwardedProto) {
     return forwardedProto === 'https'
