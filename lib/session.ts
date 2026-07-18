@@ -5,14 +5,50 @@ import { normalizeRoleId } from '@/lib/roles'
 
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'restaurant_pos_session'
 const SESSION_MAX_AGE = Number(process.env.SESSION_MAX_AGE ?? 60 * 60 * 24 * 7) // 7 days
-const SESSION_COOKIE_SECURE = (() => {
+const SESSION_COOKIE_SECURE_OVERRIDE = (() => {
   const raw = process.env.SESSION_COOKIE_SECURE
-  if (typeof raw === 'string') {
-    const normalized = raw.trim().toLowerCase()
-    return !(normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off')
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    return null
   }
-  return process.env.NODE_ENV === 'production'
+  const normalized = raw.trim().toLowerCase()
+  return !(normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off')
 })()
+
+function isPrivateOrLocalHost(hostname: string): boolean {
+  const lower = hostname.toLowerCase()
+  if (lower === 'localhost' || lower === '127.0.0.1' || lower === '::1') return true
+  if (/^10\./.test(lower)) return true
+  if (/^192\.168\./.test(lower)) return true
+  const m = lower.match(/^172\.(\d{1,3})\./)
+  if (m) {
+    const secondOctet = Number(m[1])
+    if (secondOctet >= 16 && secondOctet <= 31) return true
+  }
+  return false
+}
+
+function resolveSessionCookieSecure(req?: Request): boolean {
+  if (SESSION_COOKIE_SECURE_OVERRIDE !== null) {
+    return SESSION_COOKIE_SECURE_OVERRIDE
+  }
+
+  const forwardedProto = req?.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
+  if (forwardedProto) {
+    return forwardedProto === 'https'
+  }
+
+  try {
+    if (req?.url) {
+      const url = new URL(req.url)
+      if (url.protocol === 'https:') return true
+      if (isPrivateOrLocalHost(url.hostname)) return false
+    }
+  } catch {
+    // Fall back below
+  }
+
+  return process.env.NODE_ENV === 'production'
+}
 
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) return {}
@@ -59,12 +95,13 @@ export async function getSessionFromRequest(req: Request) {
   }
 }
 
-export function attachSessionCookie(res: NextResponse, token: string) {
+export function attachSessionCookie(res: NextResponse, token: string, req?: Request) {
+  const secure = resolveSessionCookieSecure(req)
   res.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
-    secure: SESSION_COOKIE_SECURE,
+    secure,
     sameSite: 'strict',
     path: '/',
     maxAge: SESSION_MAX_AGE,
@@ -72,12 +109,13 @@ export function attachSessionCookie(res: NextResponse, token: string) {
   return res
 }
 
-export function clearSessionCookie(res: NextResponse) {
+export function clearSessionCookie(res: NextResponse, req?: Request) {
+  const secure = resolveSessionCookieSecure(req)
   res.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: '',
     httpOnly: true,
-    secure: SESSION_COOKIE_SECURE,
+    secure,
     sameSite: 'strict',
     path: '/',
     maxAge: 0,
