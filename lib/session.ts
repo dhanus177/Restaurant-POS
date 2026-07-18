@@ -5,6 +5,14 @@ import { normalizeRoleId } from '@/lib/roles'
 
 const SESSION_COOKIE_NAME = process.env.SESSION_COOKIE_NAME ?? 'restaurant_pos_session'
 const SESSION_MAX_AGE = Number(process.env.SESSION_MAX_AGE ?? 60 * 60 * 24 * 7) // 7 days
+const SESSION_COOKIE_SECURE = (() => {
+  const raw = process.env.SESSION_COOKIE_SECURE
+  if (typeof raw === 'string') {
+    const normalized = raw.trim().toLowerCase()
+    return !(normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off')
+  }
+  return process.env.NODE_ENV === 'production'
+})()
 
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) return {}
@@ -56,7 +64,7 @@ export function attachSessionCookie(res: NextResponse, token: string) {
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: SESSION_COOKIE_SECURE,
     sameSite: 'strict',
     path: '/',
     maxAge: SESSION_MAX_AGE,
@@ -69,7 +77,7 @@ export function clearSessionCookie(res: NextResponse) {
     name: SESSION_COOKIE_NAME,
     value: '',
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: SESSION_COOKIE_SECURE,
     sameSite: 'strict',
     path: '/',
     maxAge: 0,
