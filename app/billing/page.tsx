@@ -165,15 +165,6 @@ function BillingPageContent() {
   const billCode = generateBillCode(nextOrderNumber, now)
   const barcodeSvg = generateBarcodeSVG(billCode)
 
-  const getRuntimePrintSettings = () => {
-    const desktopBridgeAvailable = typeof window !== 'undefined' && Boolean(window.desktopApp?.printHtml)
-    if (settings.forceDesktopPrintOnly !== false && !desktopBridgeAvailable) {
-      toast.warning('Desktop print bridge unavailable. Using browser print dialog for this bill.')
-      return { ...settings, forceDesktopPrintOnly: false }
-    }
-    return settings
-  }
-
   const buildPendingBill = (): Order => {
     if (confirmedWaiterOrder) {
       return {
@@ -220,8 +211,7 @@ function BillingPageContent() {
     if (billingItems.length === 0) return
 
     const bill = buildPendingBill()
-    const runtimePrintSettings = getRuntimePrintSettings()
-    printReceipt(bill, runtimePrintSettings)
+    printReceipt(bill, settings)
     toast.success(`${confirmedWaiterOrder ? 'Biller bill' : 'Billing slip'} printed: ${generateBillCode(bill.orderNumber, bill.createdAt)}`)
   }
 
@@ -255,14 +245,12 @@ function BillingPageContent() {
       }
 
       // Kitchen docket prints immediately for dine-in, but takeaway waits until cashier accepts payment.
-      const runtimePrintSettings = getRuntimePrintSettings()
-
       if (!confirmedWaiterOrder && billingTable) {
-        printKitchenDocket(order, runtimePrintSettings)
+        printKitchenDocket(order, settings)
       }
 
       // Print billing slip with barcode for cashier scanning
-      printReceipt(order, runtimePrintSettings)
+      printReceipt(order, settings)
 
       if (!confirmedWaiterOrder) {
         clearCart()

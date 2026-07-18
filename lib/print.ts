@@ -624,8 +624,7 @@ export function generateBenMarieDocketHTML(
 
 export function printDocument(
   html: string,
-  printerName?: string | null,
-  options?: { forceDesktopOnly?: boolean }
+  printerName?: string | null
 ): void {
   const browserPrint = () => {
     const iframe = document.createElement('iframe')
@@ -684,39 +683,12 @@ export function printDocument(
     iframe.src = 'about:blank'
   }
 
-  if (typeof window !== 'undefined' && window.desktopApp?.printHtml) {
-    void window.desktopApp
-      .printHtml({
-        html,
-        printerName: printerName ?? null,
-        autoCut: Boolean(printerName),
-      })
-      .then((result) => {
-        if (!result.ok) {
-          console.error('[desktop print error]', result.error ?? 'Print failed')
-          return
-        }
-
-        if (result.warning) {
-          console.warn('[desktop print warning]', result.warning)
-        }
-      })
-      .catch((error) => {
-        console.error('[desktop print error] desktop bridge failed', error)
-      })
-    return
-  }
-
-  if (options?.forceDesktopOnly) {
-    console.warn('[desktop print warning] Desktop printing requested, but desktop bridge is unavailable. Falling back to browser print dialog.')
-  }
-
   browserPrint()
 }
 
 export function printReceipt(order: Order, settings: Settings): void {
   const html = generateReceiptHTML(order, settings)
-  printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.billerPrinterName)
 }
 
 export function printKitchenDocket(
@@ -736,12 +708,12 @@ export function printKitchenDocket(
     settings,
     options
   )
-  printDocument(html, settings.kitchenPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.kitchenPrinterName)
 }
 
 export function printTakeawayDocket(order: Order, settings: Settings): void {
   const html = generateTakeawayDocketHTML(order, settings)
-  printDocument(html, settings.takeawayPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.takeawayPrinterName)
 }
 
 export function printBenMarieDocket(
@@ -762,7 +734,7 @@ export function printBenMarieDocket(
     options
   )
 
-  printDocument(html, settings.takeawayPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.takeawayPrinterName)
 }
 
 export function generateSupplierStatementHTML(
@@ -894,5 +866,5 @@ export function printSupplierStatement(
   aging: Array<{ label: string; amount: number }>
 ): void {
   const html = generateSupplierStatementHTML(supplier, entries, settings, summary, aging)
-  printDocument(html, settings.supplierStatementPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.supplierStatementPrinterName)
 }

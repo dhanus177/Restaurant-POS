@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download, MessageCircle, QrCode, Copy, ExternalLink, Wifi, Printer, ShieldAlert } from 'lucide-react'
+import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download, MessageCircle, Printer } from 'lucide-react'
 import Image from 'next/image'
 import { useTheme } from 'next-themes'
 
@@ -47,7 +47,6 @@ export default function SettingsPage() {
   const [isSendingWhatsAppReport, setIsSendingWhatsAppReport] = useState(false)
   const [backupSchedule, setBackupSchedule] = useState<BackupSchedule | null>(null)
   const [backupSnapshots, setBackupSnapshots] = useState<BackupSnapshot[]>([])
-  const [desktopHostInfo, setDesktopHostInfo] = useState<DesktopHostInfo | null>(null)
   const [availablePrinters, setAvailablePrinters] = useState<string[]>([])
   const [isLoadingPrinters, setIsLoadingPrinters] = useState(false)
   const canManageRestaurant = currentUser?.role === 'super-admin'
@@ -70,60 +69,6 @@ export default function SettingsPage() {
     if (!mounted || !canManageRestaurant) return
     void loadBackupAutomation()
   }, [mounted, canManageRestaurant])
-
-  useEffect(() => {
-    if (!mounted || typeof window === 'undefined' || !window.desktopApp) return
-
-    let isActive = true
-
-    const syncHostInfo = async () => {
-      try {
-        const info = await window.desktopApp?.getHostInfo()
-        if (!isActive || !info?.isDesktopHost) return
-        setDesktopHostInfo(info)
-      } catch {
-        // ignore desktop host info fetch failures in web mode
-      }
-    }
-
-    void syncHostInfo()
-
-    const unsubscribe = window.desktopApp.onHostEvent((payload) => {
-      if (payload.type === 'ready' && payload.hostInfo?.isDesktopHost) {
-        setDesktopHostInfo(payload.hostInfo)
-      }
-    })
-
-    return () => {
-      isActive = false
-      unsubscribe()
-    }
-  }, [mounted])
-
-  const primaryHostUrl = desktopHostInfo?.networkUrls[0] ?? desktopHostInfo?.localUrl ?? ''
-  const hostQrUrl = primaryHostUrl
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(primaryHostUrl)}`
-    : ''
-
-  const handleCopyHostUrl = async (url: string) => {
-    if (!url) return
-
-    try {
-      await navigator.clipboard.writeText(url)
-      toast.success('Host URL copied')
-    } catch {
-      toast.error('Could not copy host URL')
-    }
-  }
-
-  const handleOpenHostUrl = async (url: string) => {
-    if (!url || !window.desktopApp) return
-
-    const result = await window.desktopApp.openNetworkUrl(url)
-    if (!result.ok) {
-      toast.error(result.error ?? 'Failed to open URL')
-    }
-  }
 
   const loadBackupAutomation = async () => {
     try {
@@ -373,77 +318,6 @@ export default function SettingsPage() {
         <Card className="border-amber-200 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-500/10">
           <CardContent className="p-4 text-sm text-amber-900 dark:text-amber-100">
             You can view settings, but only the <span className="font-semibold">super admin</span> can change restaurant information, financial settings, and backup/restore data.
-          </CardContent>
-        </Card>
-      )}
-
-      {desktopHostInfo?.isDesktopHost && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wifi className="h-5 w-5" />
-              Host Server Access
-            </CardTitle>
-            <CardDescription>
-              This desktop installation is acting as the LAN host. Use one of these URLs on waiter phones/tablets.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Primary host URL</p>
-              <p className="mt-1 break-all font-mono text-sm">{primaryHostUrl}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => void handleCopyHostUrl(primaryHostUrl)}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy URL
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => void handleOpenHostUrl(primaryHostUrl)}>
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open URL
-                </Button>
-              </div>
-            </div>
-
-            {desktopHostInfo.networkUrls.length > 1 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Additional network URLs</p>
-                <div className="space-y-2">
-                  {desktopHostInfo.networkUrls.slice(1).map((url) => (
-                    <div key={url} className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="break-all font-mono text-xs text-muted-foreground">{url}</p>
-                      <div className="flex gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => void handleCopyHostUrl(url)}>
-                          <Copy className="mr-2 h-3.5 w-3.5" />
-                          Copy
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => void handleOpenHostUrl(url)}>
-                          <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                          Open
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {hostQrUrl && (
-              <div className="flex flex-col items-start gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
-                <div className="rounded-md border bg-white p-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={hostQrUrl} alt="Host URL QR Code" className="h-36 w-36" />
-                </div>
-                <div>
-                  <p className="flex items-center gap-2 text-sm font-medium">
-                    <QrCode className="h-4 w-4" />
-                    QR for quick waiter connection
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Scan this QR from a waiter device connected to the same network.
-                  </p>
-                </div>
-              </div>
-            )}
           </CardContent>
         </Card>
       )}
@@ -974,28 +848,8 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-800/60 dark:bg-slate-950/40">
-              <div className="flex items-start gap-3">
-                <ShieldAlert className="mt-0.5 h-4 w-4 text-slate-600 dark:text-slate-300" />
-                <div className="space-y-1">
-                  <div className="font-medium text-foreground">Force desktop silent print only</div>
-                  <p className="text-xs text-muted-foreground">
-                    When enabled, bill, kitchen, takeaway, and supplier statement prints will only use the desktop bridge. Browser fallback is disabled so no print popup appears on terminals.
-                  </p>
-                  <label className="flex items-center gap-2 pt-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={formData.forceDesktopPrintOnly !== false}
-                      onChange={(e) => setFormData({ ...formData, forceDesktopPrintOnly: e.target.checked })}
-                    />
-                    Enable silent desktop-only printing
-                  </label>
-                </div>
-              </div>
-            </div>
-
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800/40 dark:bg-amber-500/10 dark:text-amber-200">
-              <strong>How it works:</strong> System printers are auto-detected when this page loads. Select one from the dropdown, or leave as &quot;None&quot; to use the browser&apos;s default printer. For fully silent printing without the browser dialog, pair this with a dedicated print server (e.g. CUPS or a thermal printer driver that supports silent printing).
+              <strong>How it works:</strong> System printers are auto-detected when this page loads. Select one from the dropdown, or leave as &quot;None&quot; to use the browser&apos;s default printer. In browser/localhost mode, your browser print dialog may appear depending on OS and printer driver settings.
             </div>
 
             <Button onClick={() => void loadSystemPrinters()} variant="outline" size="sm" disabled={isLoadingPrinters}>
