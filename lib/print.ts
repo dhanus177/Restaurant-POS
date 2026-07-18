@@ -736,7 +736,7 @@ export function printKitchenDocket(
     settings,
     options
   )
-  printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.kitchenPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
 export function printTakeawayDocket(order: Order, settings: Settings): void {
@@ -762,8 +762,7 @@ export function printBenMarieDocket(
     options
   )
 
-  // Uses cash counter printer route as requested workflow for dockets.
-  printDocument(html, settings.billerPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
+  printDocument(html, settings.takeawayPrinterName, { forceDesktopOnly: settings.forceDesktopPrintOnly !== false })
 }
 
 export function generateSupplierStatementHTML(
