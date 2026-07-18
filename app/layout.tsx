@@ -9,6 +9,8 @@ import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const enableVercelAnalytics =
+  process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true' || process.env.VERCEL === '1'
 
 export const metadata: Metadata = {
   title: 'Veztra Soft POS',
@@ -37,7 +39,7 @@ export default function RootLayout({
         </ThemeProvider>
         <PWARegister />
         <Toaster position="top-right" richColors />
-        <Analytics />
+        {enableVercelAnalytics ? <Analytics /> : null}
       </body>
     </html>
   )
