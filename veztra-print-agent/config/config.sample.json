@@ -1,0 +1,20 @@
+{
+  "service": {
+    "port": 5050,
+    "host": "localhost",
+    "apiVersion": "v1"
+  },
+  "database": {
+    "path": ""
+  },
+  "logging": {
+    "level": "info",
+    "maxSize": "10m",
+    "maxFiles": 10
+  },
+  "print": {
+    "defaultRetries": 3,
+    "defaultRetryDelay": 5000,
+    "queueCheckInterval": 2000
+  }
+}

@@ -21,6 +21,7 @@ import { toast } from 'sonner'
 import { Store, Receipt, DollarSign, Save, Upload, X, Palette, Download, MessageCircle, Printer } from 'lucide-react'
 import Image from 'next/image'
 import { useTheme } from 'next-themes'
+import { getPrintAgentEndpointCandidates, parsePrintAgentSourceUrls } from '@/lib/print-agent'
 
 const currencies = [
   { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
@@ -32,10 +33,13 @@ const currencies = [
 ]
 
 const DEFAULT_PRINTER_VALUE = '__default_printer__'
+const PRINTER_SOURCE_URLS_STORAGE_KEY = 'restaurant-pos.printer-source-urls'
+const LOCAL_PRINT_AGENT_BASE_URL = 'http://localhost:5050'
 
 export default function SettingsPage() {
   const { currentUser, categories, settings, updateSettings, loadFromDB } = usePOSStore()
   const [formData, setFormData] = useState(settings)
+  const [printerSourceUrlsText, setPrinterSourceUrlsText] = useState('')
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -55,6 +59,16 @@ export default function SettingsPage() {
     setMounted(true)
     void loadFromDB()
   }, [loadFromDB])
+
+  useEffect(() => {
+    if (!mounted) return
+    setPrinterSourceUrlsText(localStorage.getItem(PRINTER_SOURCE_URLS_STORAGE_KEY) ?? '')
+  }, [mounted])
+
+  useEffect(() => {
+    if (!mounted) return
+    localStorage.setItem(PRINTER_SOURCE_URLS_STORAGE_KEY, printerSourceUrlsText)
+  }, [mounted, printerSourceUrlsText])
 
   useEffect(() => {
     if (!mounted || !canManageRestaurant) return
@@ -95,11 +109,84 @@ export default function SettingsPage() {
   const loadSystemPrinters = async () => {
     setIsLoadingPrinters(true)
     try {
-      const res = await fetch('/api/system/printers')
-      if (res.ok) {
-        const data = (await res.json()) as { printers: string[] }
-        setAvailablePrinters(data.printers || [])
+      const parsePrinterList = (payload: unknown): string[] => {
+        if (Array.isArray(payload)) {
+          return payload
+            .map((row) => (typeof row === 'string' ? row : (row as { id?: string; name?: string })?.id || (row as { id?: string; name?: string })?.name))
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        }
+
+        if (Array.isArray((payload as { printers?: string[] } | null)?.printers)) {
+          return ((payload as { printers?: string[] }).printers ?? []).filter(
+            (value): value is string => typeof value === 'string' && value.trim().length > 0
+          )
+        }
+
+        if (Array.isArray((payload as { data?: Array<{ id?: string; name?: string }> } | null)?.data)) {
+          return ((payload as { data?: Array<{ id?: string; name?: string }> }).data ?? [])
+            .map((row) => row.id || row.name)
+            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        }
+
+        return []
       }
+
+      const parseUsbDetectionList = (payload: unknown): string[] => {
+        const rows = Array.isArray((payload as { data?: Array<{ name?: string; vendorId?: string; productId?: string }> } | null)?.data)
+          ? (payload as { data?: Array<{ name?: string; vendorId?: string; productId?: string }> }).data ?? []
+          : Array.isArray(payload)
+            ? (payload as Array<{ name?: string; vendorId?: string; productId?: string }>)
+            : []
+
+        return rows
+          .map((row) => {
+            const base = row.name?.trim()
+            if (base) return base
+            if (row.vendorId && row.productId) return `USB Printer (${row.vendorId}:${row.productId})`
+            return ''
+          })
+          .filter((value): value is string => value.length > 0)
+      }
+
+      const extraAgentUrls = parsePrintAgentSourceUrls(printerSourceUrlsText)
+
+      const fetchPrinterPayload = async (baseUrl: string, endpointPath: string): Promise<unknown | null> => {
+        for (const endpoint of getPrintAgentEndpointCandidates(baseUrl, endpointPath)) {
+          try {
+            const response = await fetch(endpoint, { cache: 'no-store' })
+            if (!response.ok) continue
+            return (await response.json().catch(() => null)) as unknown
+          } catch {
+            // Try the next candidate.
+          }
+        }
+
+        return null
+      }
+
+      const [localConfiguredPayload, localUsbPayload, serverPayload] = await Promise.all([
+        fetchPrinterPayload(LOCAL_PRINT_AGENT_BASE_URL, '/printers'),
+        fetchPrinterPayload(LOCAL_PRINT_AGENT_BASE_URL, '/printers/detect/usb'),
+        fetch('/api/system/printers', { cache: 'no-store' }).then(async (response) => (response.ok ? (await response.json().catch(() => null)) as unknown : null)),
+      ])
+
+      const localConfiguredPrinters = parsePrinterList(localConfiguredPayload)
+      const localUsbPrinters = parseUsbDetectionList(localUsbPayload)
+      const serverPrinters = parsePrinterList(serverPayload)
+      const extraPrinters: string[] = []
+
+      for (const baseUrl of extraAgentUrls) {
+        const [configuredPayload, usbPayload] = await Promise.all([
+          fetchPrinterPayload(baseUrl, '/printers'),
+          fetchPrinterPayload(baseUrl, '/printers/detect/usb'),
+        ])
+
+        extraPrinters.push(...parsePrinterList(configuredPayload), ...parseUsbDetectionList(usbPayload))
+      }
+
+      // Merge and de-duplicate so both PCs' printers can appear in one list.
+      const mergedPrinters = Array.from(new Set([...localConfiguredPrinters, ...localUsbPrinters, ...extraPrinters, ...serverPrinters]))
+      setAvailablePrinters(mergedPrinters)
     } catch (error) {
       console.error('Failed to load system printers:', error)
     } finally {
@@ -850,6 +937,23 @@ export default function SettingsPage() {
 
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800/40 dark:bg-amber-500/10 dark:text-amber-200">
               <strong>How it works:</strong> System printers are auto-detected when this page loads. Select one from the dropdown, or leave as &quot;None&quot; to use the browser&apos;s default printer. In browser/localhost mode, your browser print dialog may appear depending on OS and printer driver settings.
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="printer-source-urls">Additional print-agent URLs</Label>
+              <Textarea
+                id="printer-source-urls"
+                rows={3}
+                value={printerSourceUrlsText}
+                onChange={(e) => setPrinterSourceUrlsText(e.target.value)}
+                placeholder={[
+                  'http://192.168.1.10:5050/api/v1',
+                  'http://192.168.1.11:5050/api/v1',
+                ].join('\n')}
+              />
+              <p className="text-xs text-muted-foreground">
+                Add the other PC&apos;s Veztra print-agent API URL here (one per line or comma-separated). Use <code>/api/v1</code> for the new agent; the app also retries the legacy <code>/api</code> path when needed.
+              </p>
             </div>
 
             <Button onClick={() => void loadSystemPrinters()} variant="outline" size="sm" disabled={isLoadingPrinters}>

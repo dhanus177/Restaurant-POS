@@ -1,0 +1,191 @@
+================================================================================
+VEZTRA PRINT AGENT - HOW TO RUN ON WINDOWS
+================================================================================
+
+THREE WAYS TO INSTALL:
+
+1. AUTOMATIC (Recommended)
+   - Right-click INSTALL.bat
+   - Select "Run as Administrator"
+   - Wait ~2-3 minutes
+   - Done!
+
+2. SIMPLE MODE (If #1 doesn't work)
+   - Right-click INSTALL_SIMPLE.bat
+   - Select "Run as Administrator"
+   - Wait ~2-3 minutes
+   - Watch the output
+   - Press any key at the end
+
+3. MANUAL STEPS (Copy-paste in Command Prompt)
+   - Open Command Prompt as Administrator
+   - See INSTALL_TROUBLESHOOTING.md for manual steps
+
+================================================================================
+BEFORE YOU START:
+================================================================================
+
+REQUIREMENT 1: Node.js 18+
+  1. Download from https://nodejs.org/
+  2. Run installer
+  3. Accept all defaults
+  4. IMPORTANT: Make sure "Add to PATH" is checked
+  5. Restart your computer
+
+REQUIREMENT 2: Administrator Access
+  - You need Admin rights to run the installer
+  - Right-click and choose "Run as Administrator"
+
+REQUIREMENT 3: Thermal Printer (optional for setup)
+  - USB printer, OR
+  - Network printer (TCP/IP)
+
+================================================================================
+STEP-BY-STEP INSTALLATION:
+================================================================================
+
+Step 1: Download Node.js
+  - Go to https://nodejs.org/
+  - Download "LTS" version (Long Term Support)
+  - Run installer
+  - Use all defaults
+  - Restart computer
+
+Step 2: Extract Veztra Print Agent
+  - Download the project folder
+  - Extract to any location (e.g., Downloads or C:\)
+  - Remember the folder location
+
+Step 3: Run the Installer
+  - Navigate to: platforms\windows\
+  - Right-click INSTALL.bat
+  - Click "Run as Administrator"
+  - Wait for completion (shows "Installation Complete!")
+
+Step 4: Verify Installation
+  - Open Command Prompt
+  - Run: curl http://localhost:5050/api/v1/health
+  - Should see: {"status":"online"...}
+
+Step 5: Add Your Printer
+  - Run: curl http://localhost:5050/api/v1/printers/detect/usb
+  - See WINDOWS_INSTALL.md for full example
+
+================================================================================
+IF BATCH FILE DOESN'T WORK:
+================================================================================
+
+Problem 1: Batch file closes immediately
+  Solution: Use INSTALL_SIMPLE.bat instead (shows more output)
+
+Problem 2: Administrator error
+  Solution: Right-click and select "Run as Administrator" (not just "Run")
+
+Problem 3: Node.js not found
+  Solution: 
+    1. Restart computer after installing Node.js
+    2. Or manually add to PATH and restart
+
+Problem 4: Stuck on npm install
+  Solution: Wait longer (can take 2-3 minutes)
+            Or try INSTALL_SIMPLE.bat which shows progress
+
+For more help, see: INSTALL_TROUBLESHOOTING.md
+
+================================================================================
+AFTER INSTALLATION:
+================================================================================
+
+SERVICE STARTS AUTOMATICALLY ON LOGIN
+
+To start manually:
+  Option 1: Double-click the Desktop shortcut "Veztra Print Agent"
+  Option 2: Search for "Veztra Print Agent" in Start Menu
+  Option 3: Command line:
+            node "C:\Program Files\VeztraPrintAgent\dist\index.js"
+
+To verify it's running:
+  curl http://localhost:5050/api/v1/health
+
+To view logs:
+  type %APPDATA%\VeztraPrintAgent\logs\service.log
+
+================================================================================
+WHERE YOUR STUFF IS:
+================================================================================
+
+Application:   C:\Program Files\VeztraPrintAgent\
+Configuration: %APPDATA%\VeztraPrintAgent\config.json
+Database:      %APPDATA%\VeztraPrintAgent\veztra.db
+Logs:          %APPDATA%\VeztraPrintAgent\logs\service.log
+Shortcuts:     Desktop and Start Menu
+
+================================================================================
+COMMON COMMANDS:
+================================================================================
+
+Check status:
+  curl http://localhost:5050/api/v1/health
+
+Detect USB printers:
+  curl http://localhost:5050/api/v1/printers/detect/usb
+
+View last 50 logs:
+  curl "http://localhost:5050/api/v1/logs?lines=50"
+
+Stop service:
+  taskkill /F /IM node.exe
+
+View config:
+  type %APPDATA%\VeztraPrintAgent\config.json
+
+View logs file:
+  type %APPDATA%\VeztraPrintAgent\logs\service.log
+
+Check if port 5050 is open:
+  netstat -ano | findstr :5050
+
+================================================================================
+NEXT STEPS:
+================================================================================
+
+1. Read: WINDOWS_INSTALL.md (detailed guide)
+2. Add your printer (follow examples)
+3. Test print
+4. Integrate with your POS
+5. See API.md for complete API reference
+
+================================================================================
+NEED HELP?
+================================================================================
+
+If installer fails:
+  1. Read INSTALL_TROUBLESHOOTING.md
+  2. Try INSTALL_SIMPLE.bat instead
+  3. Do manual installation steps
+
+If service won't print:
+  1. Check printer is connected
+  2. Run: curl http://localhost:5050/api/v1/printers/detect/usb
+  3. View logs to see errors
+  4. See WINDOWS_TROUBLESHOOTING.md
+
+If you get stuck:
+  1. Capture output: INSTALL.bat > output.txt 2>&1
+  2. Read the output.txt file
+  3. See what line it failed on
+
+================================================================================
+SUMMARY:
+================================================================================
+
+✓ Install Node.js
+✓ Run INSTALL.bat as Administrator
+✓ Wait for "Installation Complete!"
+✓ Service starts on login automatically
+✓ Add printer via API
+✓ Start printing!
+
+Ready? Let's go! 🖨️
+
+================================================================================

@@ -1,0 +1,238 @@
+================================================================================
+VEZTRA PRINT AGENT - INSTALLER FIXED
+================================================================================
+
+The batch installer has been fixed and improved.
+
+THREE INSTALLATION OPTIONS NOW AVAILABLE:
+
+1. INSTALL.bat (Improved)
+   - More robust error handling
+   - Better path detection
+   - Step-by-step progress display
+   - Fixed the original package.json issue
+
+2. INSTALL_SIMPLE.bat (NEW - Simpler)
+   - No frills, just works
+   - Shows all output
+   - Doesn't close window automatically
+   - Good for debugging
+
+3. Manual installation (See INSTALL_TROUBLESHOOTING.md)
+   - Copy-paste commands in Command Prompt
+   - Full control over each step
+   - Best for understanding what happens
+
+================================================================================
+WHAT WAS WRONG (Original Issue):
+================================================================================
+
+Original error:
+  "npm error path C:\Program Files\VeztraPrintAgent\package.json"
+  "npm error errno -4058 enoent"
+
+Root cause:
+  - Tried to run npm install before copying source files
+  - package.json didn't exist yet
+  - Wrong working directory
+
+Fix applied:
+  - Copy source files FIRST
+  - THEN run npm install
+  - Verify paths before running commands
+
+================================================================================
+HOW TO USE THE FIXED INSTALLER:
+================================================================================
+
+RECOMMENDED: INSTALL.bat
+  1. Right-click INSTALL.bat
+  2. Select "Run as Administrator"
+  3. Wait for completion (shows each step)
+
+ALTERNATIVE: INSTALL_SIMPLE.bat
+  1. Right-click INSTALL_SIMPLE.bat
+  2. Select "Run as Administrator"
+  3. Watch the output for any errors
+  4. Press any key when done
+
+MANUAL: See INSTALL_TROUBLESHOOTING.md
+  - For command-line installation
+  - For understanding each step
+  - For troubleshooting
+
+================================================================================
+NEW DOCUMENTATION ADDED:
+================================================================================
+
+INSTALL_TROUBLESHOOTING.md (350+ lines)
+  - Fixes for common batch file issues
+  - Manual installation steps
+  - Verification procedures
+  - Common error messages and solutions
+  - Clean reinstall instructions
+
+platforms/windows/HOW_TO_RUN.txt
+  - Quick reference guide
+  - Step-by-step installation
+  - Where files are stored
+  - Common commands
+  - Troubleshooting quick answers
+
+================================================================================
+IMPROVEMENTS MADE:
+================================================================================
+
+Installation Process:
+  ✓ Fixed: Copy files before npm install
+  ✓ Improved: Better error detection
+  ✓ Improved: Clear step-by-step progress
+  ✓ Improved: Better path resolution
+  ✓ Added: Verification at each step
+
+Error Handling:
+  ✓ Check admin privileges
+  ✓ Check Node.js installation
+  ✓ Verify source files exist
+  ✓ Check npm install success
+  ✓ Check TypeScript build success
+
+User Experience:
+  ✓ Better progress messages
+  ✓ Clear instructions after completion
+  ✓ Shows where files are located
+  ✓ Explains next steps
+  ✓ Lists common commands
+
+================================================================================
+INSTALLATION NOW WORKS BY:
+================================================================================
+
+Step 1: Check Prerequisites
+  ✓ Administrator privileges
+  ✓ Node.js installed
+  ✓ Source files available
+
+Step 2: Create Directories
+  ✓ C:\Program Files\VeztraPrintAgent\
+  ✓ %APPDATA%\VeztraPrintAgent\
+  ✓ %APPDATA%\VeztraPrintAgent\logs\
+
+Step 3: Copy Source Files FIRST
+  ✓ src/ folder
+  ✓ package.json
+  ✓ tsconfig.json
+  ✓ Create dist/ folder
+
+Step 4: Install Dependencies
+  ✓ npm install --production
+  ✓ ~1-2 minutes depending on internet
+
+Step 5: Build TypeScript
+  ✓ npm run build
+  ✓ Creates dist/index.js
+
+Step 6: Configure Autostart
+  ✓ Add to Windows Registry
+  ✓ Create Desktop shortcut
+  ✓ Create Start Menu shortcut
+
+================================================================================
+USAGE AFTER INSTALLATION:
+================================================================================
+
+Service starts automatically on login.
+
+Manual start:
+  node "C:\Program Files\VeztraPrintAgent\dist\index.js"
+
+Verify running:
+  curl http://localhost:5050/api/v1/health
+
+Add printer:
+  curl http://localhost:5050/api/v1/printers/detect/usb
+
+Test print:
+  curl -X POST http://localhost:5050/api/v1/print
+
+View logs:
+  curl http://localhost:5050/api/v1/logs
+
+================================================================================
+FILES UPDATED:
+================================================================================
+
+INSTALL.bat (Updated)
+  - Fixed order of operations
+  - Better error handling
+  - Progress display
+  - 160+ lines
+
+INSTALL_SIMPLE.bat (New)
+  - Simpler alternative
+  - Shows all output
+  - 76 lines
+
+INSTALL_TROUBLESHOOTING.md (New)
+  - 350+ lines
+  - Common issues and fixes
+  - Manual installation
+  - Verification steps
+  - Command reference
+
+platforms/windows/HOW_TO_RUN.txt (New)
+  - 192 lines
+  - Quick reference
+  - Step-by-step guide
+  - FAQ answers
+
+================================================================================
+WHAT TO DO NOW:
+================================================================================
+
+1. USE THE FIXED INSTALLER:
+   Right-click INSTALL.bat → Run as Administrator
+
+2. IF IT FAILS:
+   Try INSTALL_SIMPLE.bat instead
+
+3. IF STILL FAILING:
+   Follow manual steps in INSTALL_TROUBLESHOOTING.md
+
+4. AFTER INSTALLATION:
+   See HOW_TO_RUN.txt for next steps
+
+================================================================================
+VERIFICATION:
+================================================================================
+
+After installation completes:
+
+1. Check status:
+   curl http://localhost:5050/api/v1/health
+
+2. View logs:
+   curl http://localhost:5050/api/v1/logs
+
+3. Detect printers:
+   curl http://localhost:5050/api/v1/printers/detect/usb
+
+4. Check config exists:
+   type %APPDATA%\VeztraPrintAgent\config.json
+
+If all these work, installation is successful!
+
+================================================================================
+READY TO INSTALL!
+================================================================================
+
+Next step: Run INSTALL.bat as Administrator
+
+The installer is fixed and ready to go.
+
+See HOW_TO_RUN.txt for quick reference.
+See INSTALL_TROUBLESHOOTING.md if you hit any issues.
+
+Good luck! 🖨️
+
+================================================================================

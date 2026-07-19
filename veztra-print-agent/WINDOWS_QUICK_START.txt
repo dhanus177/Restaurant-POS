@@ -1,0 +1,242 @@
+================================================================================
+VEZTRA PRINT AGENT - WINDOWS QUICK START
+================================================================================
+
+REQUIREMENTS:
+  ✓ Windows 10, 11, or Server 2019+
+  ✓ Node.js 18+ (download from https://nodejs.org/)
+  ✓ Administrator privileges
+  ✓ USB or Network thermal printer (optional for testing)
+
+================================================================================
+INSTALLATION (5 MINUTES)
+================================================================================
+
+STEP 1: Install Node.js
+  1. Download from: https://nodejs.org/
+  2. Run the installer
+  3. Accept default settings (IMPORTANT: Check "Add to PATH")
+  4. Restart your computer (recommended)
+  5. Verify: Open Command Prompt and type: node --version
+
+STEP 2: Extract Veztra Print Agent
+  1. Download or extract the project
+  2. Note the folder location (e.g., C:\Veztra or Downloads)
+
+STEP 3: Run the Installer
+  1. Navigate to: platforms\windows\
+  2. Right-click INSTALL.bat
+  3. Select "Run as Administrator"
+  4. Wait for completion (displays "Installation Complete!")
+  5. Close the window
+
+STEP 4: Verify Installation
+  1. Open Command Prompt or PowerShell
+  2. Run: curl http://localhost:5050/api/v1/health
+  3. You should see: {"status":"online",...}
+
+================================================================================
+WHAT GETS INSTALLED
+================================================================================
+
+Application:      C:\Program Files\VeztraPrintAgent\
+Configuration:    %APPDATA%\VeztraPrintAgent\config.json
+Database:         %APPDATA%\VeztraPrintAgent\veztra.db
+Logs:             %APPDATA%\VeztraPrintAgent\logs\service.log
+Shortcuts:        Desktop & Start Menu
+Autostart:        Windows Registry (auto-starts on login)
+
+================================================================================
+STARTING THE SERVICE
+================================================================================
+
+AUTOMATIC (Default):
+  - Service starts automatically when you log in to Windows
+  - Check if running: curl http://localhost:5050/api/v1/health
+
+MANUAL:
+  Option 1: Run START.bat (in platforms\windows\)
+  Option 2: Double-click "Veztra Print Agent" shortcut on Desktop
+  Option 3: Search "Veztra Print Agent" in Start Menu
+  Option 4: Command line:
+            node "C:\Program Files\VeztraPrintAgent\dist\index.js"
+
+================================================================================
+FIRST USE: ADD YOUR PRINTER
+================================================================================
+
+DETECT USB PRINTER:
+  curl http://localhost:5050/api/v1/printers/detect/usb
+
+ADD USB PRINTER:
+  curl -X POST http://localhost:5050/api/v1/printers ^
+    -H "Content-Type: application/json" ^
+    -d "{\"name\":\"Receipt\",\"type\":\"receipt\",\"brand\":\"xprinter\",\"connectionType\":\"usb\",\"vendorId\":\"0x0b3a\",\"productId\":\"0x0010\"}"
+
+ADD NETWORK PRINTER:
+  curl -X POST http://localhost:5050/api/v1/printers ^
+    -H "Content-Type: application/json" ^
+    -d "{\"name\":\"Kitchen\",\"type\":\"kitchen\",\"brand\":\"epson\",\"connectionType\":\"network\",\"host\":\"192.168.1.100\",\"port\":9100}"
+
+TEST PRINT:
+  curl -X POST http://localhost:5050/api/v1/print ^
+    -H "Content-Type: application/json" ^
+    -d "{\"printerId\":\"PRINTER_ID\",\"data\":\"Test Print\n[CUT]\"}"
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+Health & Status:
+  GET    /api/v1/health                   Service status
+  GET    /api/v1/system/info              System information
+  GET    /api/v1/logs                     View application logs
+
+Printer Management:
+  GET    /api/v1/printers                 List all printers
+  POST   /api/v1/printers                 Add new printer
+  GET    /api/v1/printers/detect/usb      Find USB printers
+  DELETE /api/v1/printers/{id}            Remove printer
+  POST   /api/v1/printers/{id}/test       Test printer
+
+Print Jobs:
+  POST   /api/v1/print                    Submit print job
+  GET    /api/v1/print/{jobId}            Check job status
+  GET    /api/v1/queue/stats              Queue statistics
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+SERVICE WON'T START:
+  1. Check Node.js installed: node --version
+  2. Check port 5050 is free: netstat -an | findstr :5050
+  3. Run manually to see errors: node "C:\Program Files\VeztraPrintAgent\dist\index.js"
+  4. View logs: type %APPDATA%\VeztraPrintAgent\logs\service.log
+
+CAN'T FIND PRINTER:
+  1. Ensure printer is connected (USB or Network)
+  2. Check Windows Device Manager
+  3. Try: curl http://localhost:5050/api/v1/printers/detect/usb
+  4. See WINDOWS_TROUBLESHOOTING.md for detailed help
+
+CONNECTION REFUSED:
+  1. Wait 5 seconds after starting
+  2. Check service is running: tasklist | findstr node
+  3. Check logs: curl http://localhost:5050/api/v1/logs
+
+================================================================================
+INTEGRATION WITH YOUR POS
+================================================================================
+
+From your Next.js/React application:
+
+  // Submit print job
+  const response = await fetch('http://localhost:5050/api/v1/print', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      printerId: 'receipt-printer-id',
+      data: 'Receipt content...\n[CUT]'
+    })
+  });
+
+  const job = await response.json();
+  console.log('Job ID:', job.data.id);
+
+  // Check status
+  const statusResponse = await fetch(
+    `http://localhost:5050/api/v1/print/${job.data.id}`
+  );
+  const status = await statusResponse.json();
+  console.log('Status:', status.data.status);
+
+================================================================================
+CONFIGURATION
+================================================================================
+
+Config Location: %APPDATA%\VeztraPrintAgent\config.json
+
+Example configuration:
+  {
+    "server": {
+      "port": 5050,
+      "host": "localhost"
+    },
+    "services": {
+      "healthCheckInterval": 60000,
+      "queueProcessInterval": 2000,
+      "maxRetries": 3
+    },
+    "logging": {
+      "level": "info",
+      "maxSize": "10m",
+      "maxFiles": 10
+    }
+  }
+
+After changing config, restart the service.
+
+================================================================================
+COMMON COMMANDS
+================================================================================
+
+View Status:
+  curl http://localhost:5050/api/v1/health
+
+List Printers:
+  curl http://localhost:5050/api/v1/printers
+
+View Last 50 Logs:
+  curl "http://localhost:5050/api/v1/logs?lines=50"
+
+Stop Service:
+  taskkill /F /IM node.exe
+
+View Config:
+  type %APPDATA%\VeztraPrintAgent\config.json
+
+View Logs:
+  type %APPDATA%\VeztraPrintAgent\logs\service.log
+
+================================================================================
+DOCUMENTATION
+================================================================================
+
+For more help, see these files:
+
+  WINDOWS_INSTALL.md           Detailed installation guide
+  WINDOWS_QUICK_START.txt      This file
+  README.md                    Full project README
+  API.md                       Complete API reference
+  DEVELOPMENT.md               Developer guide
+  TROUBLESHOOTING.md           Common problems & solutions
+  platforms/windows/README.md  Windows-specific docs
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+✓ Service runs in the background automatically
+✓ Listen on http://localhost:5050 (local only)
+✓ Configuration stored in %APPDATA%\VeztraPrintAgent\
+✓ Print queue stored in SQLite database
+✓ Logs auto-rotate (10MB max, 10 files kept)
+✓ Service auto-starts on Windows login (can be disabled)
+✓ No admin required to run (only for installation)
+
+================================================================================
+INSTALLATION COMPLETE!
+================================================================================
+
+Next steps:
+  1. Open your browser or curl to verify: http://localhost:5050/api/v1/health
+  2. Add your thermal printer using the API
+  3. Test print to verify printer connection
+  4. Integrate with your POS application
+
+Questions? See WINDOWS_TROUBLESHOOTING.md or README.md
+
+Ready to print! 🖨️
+
+================================================================================

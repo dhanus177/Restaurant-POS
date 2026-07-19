@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
+import { getPrintAgentEndpointCandidates } from '@/lib/print-agent'
 
 const execAsync = promisify(exec)
-const PRINT_AGENT_BASE_URL = (process.env.PRINT_AGENT_BASE_URL ?? 'http://127.0.0.1:5050/api').replace(/\/$/, '')
+const PRINT_AGENT_BASE_URL = process.env.PRINT_AGENT_BASE_URL ?? 'http://localhost:5050'
 const PRINT_AGENT_ENABLED = (process.env.PRINT_AGENT_ENABLED ?? 'true').toLowerCase() !== 'false'
 
 type AgentPrinter = {
@@ -57,30 +58,34 @@ async function getPrintAgentPrinters(): Promise<string[]> {
   if (!PRINT_AGENT_ENABLED) return []
 
   try {
-    const upstream = await fetch(`${PRINT_AGENT_BASE_URL}/printers`, { cache: 'no-store' })
-    if (!upstream.ok) {
-      return []
-    }
+    const endpoints = getPrintAgentEndpointCandidates(PRINT_AGENT_BASE_URL, '/printers')
 
-    const text = await upstream.text()
-    let payload: unknown = null
-    if (text) {
-      try {
-        payload = JSON.parse(text)
-      } catch {
-        payload = null
+    for (const endpoint of endpoints) {
+      const upstream = await fetch(endpoint, { cache: 'no-store' })
+      if (!upstream.ok) {
+        continue
       }
+
+      const text = await upstream.text()
+      let payload: unknown = null
+      if (text) {
+        try {
+          payload = JSON.parse(text)
+        } catch {
+          payload = null
+        }
+      }
+
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray((payload as any)?.data)
+          ? (payload as any).data
+          : []
+
+      return (rows as AgentPrinter[])
+        .map((printer) => printer.id || printer.name)
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     }
-
-    const rows = Array.isArray(payload)
-      ? payload
-      : Array.isArray((payload as any)?.data)
-        ? (payload as any).data
-        : []
-
-    return (rows as AgentPrinter[])
-      .map((printer) => printer.id || printer.name)
-      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
   } catch (error) {
     console.error('[system printers proxy error]', error)
     return []

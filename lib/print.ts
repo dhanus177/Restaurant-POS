@@ -648,6 +648,7 @@ export function printDocument(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           printerId,
+          printerName: printerId,
           data: rawText,
           format: 'raw',
           maxRetries: 3,
