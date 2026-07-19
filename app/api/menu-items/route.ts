@@ -23,6 +23,20 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const { modifierGroups, ...rest } = body
+
+    if (typeof rest.categoryId !== 'string' || !rest.categoryId.trim()) {
+      return NextResponse.json({ error: 'A valid category is required to create a menu item.' }, { status: 400 })
+    }
+
+    const category = await prisma.category.findUnique({
+      where: { id: rest.categoryId },
+      select: { id: true },
+    })
+
+    if (!category) {
+      return NextResponse.json({ error: 'Selected category does not exist. Please pick a valid category.' }, { status: 400 })
+    }
+
     const item = await prisma.menuItem.create({
       data: {
         ...rest,
@@ -50,6 +64,19 @@ export async function POST(req: Request) {
   } catch (error) {
     const isMissingColumn =
       error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022'
+
+    const isForeignKeyError =
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003'
+
+    if (isForeignKeyError) {
+      return NextResponse.json(
+        {
+          error:
+            'Selected category is invalid or missing. Create the category first, then try adding the menu item again.',
+        },
+        { status: 400 }
+      )
+    }
 
     if (isMissingColumn) {
       return NextResponse.json(

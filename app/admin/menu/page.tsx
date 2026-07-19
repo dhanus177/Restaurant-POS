@@ -77,6 +77,11 @@ export default function MenuManagementPage() {
   }
 
   const handleAdd = () => {
+    if (categories.length === 0) {
+      toast.error('Create a category first before adding menu items')
+      return
+    }
+
     setSelectedItem(null)
     setFormData({
       name: '',
@@ -93,6 +98,12 @@ export default function MenuManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!formData.categoryId) {
+      toast.error('Please select a category for this menu item')
+      return
+    }
+
     if (selectedItem) {
       const error = await updateMenuItem(selectedItem.id, formData)
       if (error) {
@@ -372,9 +383,10 @@ export default function MenuManagementPage() {
                   <Select
                     value={formData.categoryId}
                     onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                    disabled={categories.length === 0}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder={categories.length === 0 ? 'Create a category first' : 'Select a category'} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((cat) => (
@@ -384,6 +396,11 @@ export default function MenuManagementPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {categories.length === 0 && (
+                    <p className="text-xs text-destructive">
+                      No categories exist yet. Add one in Admin → Categories before creating menu items.
+                    </p>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="prepStation">Prep Station</Label>
@@ -420,7 +437,9 @@ export default function MenuManagementPage() {
               <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShowForm(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="w-full sm:w-auto">{selectedItem ? 'Update' : 'Add'}</Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={!formData.categoryId && categories.length === 0}>
+                {selectedItem ? 'Update' : 'Add'}
+              </Button>
             </div>
           </form>
         </DialogContent>
