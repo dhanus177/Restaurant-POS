@@ -358,11 +358,6 @@ export default function LoginPage() {
       )}
 
       <div className="mt-8 text-center text-xs text-muted-foreground">
-        <div className="mb-3">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/setup">Open Setup</Link>
-          </Button>
-        </div>
         <p>All Rights Reserved © {new Date().getFullYear()}</p>
       </div>
     </div>
