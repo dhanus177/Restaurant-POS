@@ -195,3 +195,77 @@ If you run Prisma inside Docker app container, use:
 ```dotenv
 DATABASE_URL="postgresql://posuser:yoshie123@db:5432/vr_pos"
 ```
+
+### 11. Production print-agent (Windows + Ubuntu)
+
+This repository now includes a bundled print service at `veztra-print-agent/`.
+
+Use this when you want silent/background receipt printing (USB or network) without browser print dialogs.
+
+#### 11.1 Recommended app env for production print proxy
+
+Add these to your app `.env` (or container env):
+
+```dotenv
+PRINT_AGENT_ENABLED="true"
+PRINT_AGENT_BASE_URL="http://localhost:5050"
+```
+
+> If print-agent runs on another host, set `PRINT_AGENT_BASE_URL` to that host (for example `http://192.168.1.50:5050`).
+
+#### 11.2 Windows production run (service install)
+
+From repo root:
+
+```powershell
+Set-Location .\veztra-print-agent
+npm install
+npm run build
+powershell -ExecutionPolicy Bypass -File .\platforms\windows\install.ps1
+```
+
+After install, verify:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://localhost:5050/api/v1/health | Select-Object -ExpandProperty Content
+```
+
+#### 11.3 Ubuntu production run (systemd)
+
+From repo root:
+
+```bash
+cd veztra-print-agent
+npm install
+npm run build
+sudo bash platforms/linux/install.sh
+sudo systemctl enable veztra-print-agent
+sudo systemctl start veztra-print-agent
+```
+
+Verify:
+
+```bash
+curl http://localhost:5050/api/v1/health
+```
+
+#### 11.4 Printer registration checklist
+
+1. Add printer in `Admin -> Settings -> Printer Settings`.
+2. For network printers, ensure IP and port (usually `9100`) are reachable.
+3. Confirm print-agent health endpoint is green.
+4. Submit one test bill and confirm queue shows `completed`.
+
+Quick API checks:
+
+```bash
+curl http://localhost:5050/api/v1/printers
+curl http://localhost:5050/api/v1/queue/stats
+```
+
+#### 11.5 Production hardening notes
+
+- Keep print-agent on private LAN (do not expose port `5050` publicly).
+- Use host firewall rules to limit access to trusted app hosts only.
+- Keep one logical printer entry per device to avoid queue confusion.
+- Monitor failed jobs via `/api/v1/queue/stats` and `/api/v1/logs`.
