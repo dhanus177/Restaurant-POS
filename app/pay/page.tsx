@@ -123,11 +123,10 @@ export default function PayPage() {
     if (!q) return unpaidOrders
 
     return unpaidOrders.filter((o) => {
-      const billCode = generateBillCode(o.orderNumber, o.createdAt).toLowerCase()
       return (
         String(o.orderNumber).includes(q) ||
         (o.tableName || '').toLowerCase().includes(q) ||
-        billCode.includes(q)
+        matchesBillScanInput(o.orderNumber, o.createdAt, q)
       )
     })
   }, [query, scanCode, unpaidOrders])
