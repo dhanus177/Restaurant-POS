@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 function toAppMenuItem(item: any) {
@@ -19,30 +20,48 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const body = await req.json()
-  const { modifierGroups, ...rest } = body
-  const item = await prisma.menuItem.create({
-    data: {
-      ...rest,
-      modifierGroups: modifierGroups?.length
-        ? {
-            create: modifierGroups.map((mg: any) => ({
-              id: mg.id,
-              name: mg.name,
-              required: mg.required,
-              maxSelections: mg.maxSelections,
-              modifiers: {
-                create: mg.modifiers.map((m: any) => ({
-                  id: m.id,
-                  name: m.name,
-                  price: m.price,
-                })),
-              },
-            })),
-          }
-        : undefined,
-    },
-    include: { modifierGroups: { include: { modifiers: true } } },
-  })
-  return NextResponse.json(toAppMenuItem(item), { status: 201 })
+  try {
+    const body = await req.json()
+    const { modifierGroups, ...rest } = body
+    const item = await prisma.menuItem.create({
+      data: {
+        ...rest,
+        modifierGroups: modifierGroups?.length
+          ? {
+              create: modifierGroups.map((mg: any) => ({
+                id: mg.id,
+                name: mg.name,
+                required: mg.required,
+                maxSelections: mg.maxSelections,
+                modifiers: {
+                  create: mg.modifiers.map((m: any) => ({
+                    id: m.id,
+                    name: m.name,
+                    price: m.price,
+                  })),
+                },
+              })),
+            }
+          : undefined,
+      },
+      include: { modifierGroups: { include: { modifiers: true } } },
+    })
+    return NextResponse.json(toAppMenuItem(item), { status: 201 })
+  } catch (error) {
+    const isMissingColumn =
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022'
+
+    if (isMissingColumn) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is missing the latest menu item columns. Run prisma migrate deploy (or redeploy containers) and try again.',
+        },
+        { status: 500 }
+      )
+    }
+
+    console.error('[menu-items.post error]', error)
+    return NextResponse.json({ error: 'Failed to create menu item.' }, { status: 500 })
+  }
 }

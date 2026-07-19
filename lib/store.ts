@@ -138,8 +138,8 @@ interface POSStore {
   addCategory: (category: Category) => void
   updateCategory: (id: string, category: Partial<Category>) => void
   deleteCategory: (id: string) => void
-  addMenuItem: (item: MenuItem) => void
-  updateMenuItem: (id: string, item: Partial<MenuItem>) => void
+  addMenuItem: (item: MenuItem) => Promise<string | null>
+  updateMenuItem: (id: string, item: Partial<MenuItem>) => Promise<string | null>
   deleteMenuItem: (id: string) => void
   toggleItemAvailability: (id: string) => void
 
@@ -399,13 +399,47 @@ const response = await apiFetch('/api/auth/me', {
         set((state) => ({ categories: state.categories.filter((c) => c.id !== id) }))
         dbSync('DELETE', `/api/categories/${id}`)
       },
-      addMenuItem: (item) => {
-        set((state) => ({ menuItems: [...state.menuItems, item] }))
-        dbSync('POST', '/api/menu-items', item)
+      addMenuItem: async (item) => {
+        try {
+          const response = await apiFetch('/api/menu-items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(item),
+          })
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => null)
+            return data?.error ?? 'Failed to add menu item'
+          }
+
+          const created = (await response.json()) as MenuItem
+          set((state) => ({ menuItems: [...state.menuItems.filter((existing) => existing.id !== created.id), created] }))
+          return null
+        } catch (error) {
+          console.error('[addMenuItem error]', error)
+          return 'Failed to add menu item'
+        }
       },
-      updateMenuItem: (id, itemData) => {
-        set((state) => ({ menuItems: state.menuItems.map((i) => (i.id === id ? { ...i, ...itemData } : i)) }))
-        dbSync('PATCH', `/api/menu-items/${id}`, itemData)
+      updateMenuItem: async (id, itemData) => {
+        try {
+          const response = await apiFetch(`/api/menu-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(itemData),
+          })
+
+          if (!response.ok) {
+            const data = await response.json().catch(() => null)
+            return data?.error ?? 'Failed to update menu item'
+          }
+
+          const updated = (await response.json()) as MenuItem
+          set((state) => ({ menuItems: state.menuItems.map((i) => (i.id === id ? updated : i)) }))
+          return null
+        } catch (error) {
+          console.error('[updateMenuItem error]', error)
+          return 'Failed to update menu item'
+        }
       },
       deleteMenuItem: (id) => {
         set((state) => ({ menuItems: state.menuItems.filter((i) => i.id !== id) }))

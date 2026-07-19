@@ -91,17 +91,25 @@ export default function MenuManagementPage() {
     setShowForm(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedItem) {
-      updateMenuItem(selectedItem.id, formData)
+      const error = await updateMenuItem(selectedItem.id, formData)
+      if (error) {
+        toast.error(error)
+        return
+      }
       toast.success('Menu item updated')
     } else {
-      addMenuItem({
+      const error = await addMenuItem({
         id: `item-${Date.now()}`,
         ...formData,
         modifierGroups: [],
       })
+      if (error) {
+        toast.error(error)
+        return
+      }
       toast.success('Menu item added')
     }
     setShowForm(false)

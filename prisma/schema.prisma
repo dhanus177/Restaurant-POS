@@ -34,6 +34,7 @@ model MenuItem {
   image              String?
   isAvailable        Boolean         @default(true)
   applyServiceCharge Boolean         @default(false)
+  prepStation        String          @default("kitchen")
   category           Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   modifierGroups     ModifierGroup[]
   recipes            ProductRecipe[]
