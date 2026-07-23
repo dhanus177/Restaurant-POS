@@ -61,7 +61,6 @@ const DEFAULT_SETTINGS: Settings = {
   customRoles: [],
   waiterVisibleCategoryIds: [],
   supplierStatementPrinterName: undefined,
-  forceDesktopPrintOnly: true,
 }
 
 interface CartItem extends OrderItem {

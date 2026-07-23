@@ -7,6 +7,11 @@ set -e
 
 echo "=== Veztra Print Agent - Linux Installation ==="
 
+# Resolve installer paths so the script works from any current directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+SERVICE_SRC="$PROJECT_ROOT/platforms/linux/veztra-print-agent.service"
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root"
@@ -75,7 +80,7 @@ chmod 755 /var/log/veztra-print-agent
 
 # Install application files
 echo "Installing application files..."
-cp -r ./* /opt/veztra-print-agent/
+cp -r "$PROJECT_ROOT"/* /opt/veztra-print-agent/
 cd /opt/veztra-print-agent
 
 # Install dependencies
@@ -85,7 +90,12 @@ npm run build
 
 # Copy systemd service file
 echo "Installing systemd service..."
-cp platforms/linux/veztra-print-agent.service /etc/systemd/system/
+if [[ ! -f "$SERVICE_SRC" ]]; then
+    echo "Service file not found at: $SERVICE_SRC"
+    exit 1
+fi
+
+cp "$SERVICE_SRC" /etc/systemd/system/veztra-print-agent.service
 systemctl daemon-reload
 
 # Set correct permissions

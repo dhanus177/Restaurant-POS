@@ -320,5 +320,4 @@ export interface Settings {
   kitchenPrinterName?: string
   takeawayPrinterName?: string
   supplierStatementPrinterName?: string
-  forceDesktopPrintOnly?: boolean
 }
