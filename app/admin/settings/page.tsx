@@ -309,13 +309,16 @@ export default function SettingsPage() {
         }),
       })
 
-      if (!res.ok) throw new Error('Failed to save backup schedule')
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(payload?.error || 'Failed to save backup schedule')
+      }
       const saved = (await res.json()) as BackupSchedule
       setBackupSchedule(saved)
       toast.success('Backup schedule updated')
     } catch (error) {
       console.error(error)
-      toast.error('Failed to save backup schedule')
+      toast.error(error instanceof Error ? error.message : 'Failed to save backup schedule')
     } finally {
       setIsSavingSchedule(false)
     }

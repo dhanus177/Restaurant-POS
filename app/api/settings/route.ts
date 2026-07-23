@@ -3,6 +3,40 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireActiveLicense, requireSuperAdmin } from '@/lib/server-guards'
 
+const SETTINGS_ALLOWED_KEYS = [
+  'restaurantName',
+  'address',
+  'phone',
+  'taxRate',
+  'currency',
+  'currencySymbol',
+  'receiptFooter',
+  'logo',
+  'requireCustomerBeforeOrder',
+  'kitchenPageEnabled',
+  'takeawayPageEnabled',
+  'whatsappBreakfastTime',
+  'whatsappDinnerTime',
+  'whatsappLunchTime',
+  'whatsappRecipient',
+  'whatsappReportsEnabled',
+] as const
+
+function pickAllowedSettingsFields(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object') return {}
+
+  const source = input as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+
+  for (const key of SETTINGS_ALLOWED_KEYS) {
+    if (key in source) {
+      out[key] = source[key]
+    }
+  }
+
+  return out
+}
+
 export async function GET() {
   const licenseError = await requireActiveLicense()
   if (licenseError) return licenseError
@@ -21,7 +55,12 @@ export async function PATCH(req: Request) {
     if (!actor.ok) return actor.response
   }
 
-  const body = await req.json()
+  const rawBody = await req.json()
+  const body = pickAllowedSettingsFields(rawBody)
+
+  if (Object.keys(body).length === 0) {
+    return NextResponse.json({ error: 'No valid settings fields provided.' }, { status: 400 })
+  }
   try {
     const settings = await prisma.settings.upsert({
       where: { id: 'singleton' },

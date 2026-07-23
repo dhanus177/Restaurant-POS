@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { requireActiveLicense, requireSuperAdmin } from '@/lib/server-guards'
 import { createVerifiedSnapshot, nextRunFrom } from '@/lib/backup-snapshot'
 import { writeAuditLog } from '@/lib/audit-log'
@@ -58,51 +59,67 @@ export async function PATCH(req: Request) {
   const retentionCount = Number(body?.retentionCount)
   const verifyChecksum = typeof body?.verifyChecksum === 'boolean' ? body.verifyChecksum : undefined
 
-  const existing = await prisma.backupSchedule.upsert({
-    where: { id: 'singleton' },
-    update: {},
-    create: {
-      id: 'singleton',
-      enabled: false,
-      frequencyHours: 24,
-      retentionCount: 14,
-      verifyChecksum: true,
-    },
-  })
+  try {
+    const existing = await prisma.backupSchedule.upsert({
+      where: { id: 'singleton' },
+      update: {},
+      create: {
+        id: 'singleton',
+        enabled: false,
+        frequencyHours: 24,
+        retentionCount: 14,
+        verifyChecksum: true,
+      },
+    })
 
-  const nextEnabled = enabled ?? existing.enabled
-  const nextFrequency = Number.isFinite(frequencyHours) ? Math.max(1, Math.min(24 * 14, Math.floor(frequencyHours))) : existing.frequencyHours
-  const nextRetention = Number.isFinite(retentionCount) ? Math.max(1, Math.min(120, Math.floor(retentionCount))) : existing.retentionCount
-  const nextVerify = verifyChecksum ?? existing.verifyChecksum
+    const nextEnabled = enabled ?? existing.enabled
+    const nextFrequency = Number.isFinite(frequencyHours) ? Math.max(1, Math.min(24 * 14, Math.floor(frequencyHours))) : existing.frequencyHours
+    const nextRetention = Number.isFinite(retentionCount) ? Math.max(1, Math.min(120, Math.floor(retentionCount))) : existing.retentionCount
+    const nextVerify = verifyChecksum ?? existing.verifyChecksum
 
-  const now = new Date()
-  const updated = await prisma.backupSchedule.update({
-    where: { id: 'singleton' },
-    data: {
-      enabled: nextEnabled,
-      frequencyHours: nextFrequency,
-      retentionCount: nextRetention,
-      verifyChecksum: nextVerify,
-      nextRunAt: nextEnabled ? (existing.nextRunAt && existing.nextRunAt > now ? existing.nextRunAt : nextRunFrom(now, nextFrequency)) : null,
-    },
-  })
+    const now = new Date()
+    const updated = await prisma.backupSchedule.update({
+      where: { id: 'singleton' },
+      data: {
+        enabled: nextEnabled,
+        frequencyHours: nextFrequency,
+        retentionCount: nextRetention,
+        verifyChecksum: nextVerify,
+        nextRunAt: nextEnabled ? (existing.nextRunAt && existing.nextRunAt > now ? existing.nextRunAt : nextRunFrom(now, nextFrequency)) : null,
+      },
+    })
 
-  await writeAuditLog({
-    req,
-    actor: actor.value,
-    action: 'backup.schedule.update',
-    resource: 'backup_schedule',
-    resourceId: updated.id,
-    details: {
-      enabled: updated.enabled,
-      frequencyHours: updated.frequencyHours,
-      retentionCount: updated.retentionCount,
-      verifyChecksum: updated.verifyChecksum,
-      nextRunAt: updated.nextRunAt?.toISOString() ?? null,
-    },
-  })
+    await writeAuditLog({
+      req,
+      actor: actor.value,
+      action: 'backup.schedule.update',
+      resource: 'backup_schedule',
+      resourceId: updated.id,
+      details: {
+        enabled: updated.enabled,
+        frequencyHours: updated.frequencyHours,
+        retentionCount: updated.retentionCount,
+        verifyChecksum: updated.verifyChecksum,
+        nextRunAt: updated.nextRunAt?.toISOString() ?? null,
+      },
+    })
 
-  return NextResponse.json(toSchedule(updated))
+    return NextResponse.json(toSchedule(updated))
+  } catch (error) {
+    const isMissingColumn = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022'
+    if (isMissingColumn) {
+      return NextResponse.json(
+        {
+          error:
+            'Database is missing the latest backup schedule columns. Run prisma migrate deploy (or redeploy containers) and try again.',
+        },
+        { status: 500 }
+      )
+    }
+
+    console.error('[backup.schedule.patch error]', error)
+    return NextResponse.json({ error: 'Failed to save backup schedule' }, { status: 500 })
+  }
 }
 
 export async function POST(req: Request) {
